@@ -10,6 +10,7 @@ func main(_ args: [String]) -> Int32
 
     if let path = args.first {
         do { try runFile(path) }
+        catch LoxError.interpretation { return ExitCode.interpreterFailure.returnValue }
         catch { return ExitCode.badInput.returnValue }
     }
     else {
@@ -23,6 +24,9 @@ private func runFile(_ path: String) throws
 {
     let contents = try String(contentsOfFile: path, encoding: .utf8)
     run(contents)
+    if hasError {
+        throw LoxError.interpretation
+    }
 }
 
 private func runPrompt()
@@ -30,13 +34,14 @@ private func runPrompt()
     printPrompt()
     while let line = readLine() {
         run(line)
+        hasError = false
         printPrompt()
     }
 }
 
 private func run(_ source: String)
 {
-    let scanner = Scanner(string: source)
+    let scanner = LoxScanner(source: source)
     let tokens = scanner.scanTokens()
 
     for token in tokens {
@@ -44,15 +49,25 @@ private func run(_ source: String)
     }
 }
 
-private extension Scanner
-{
-    func scanTokens() -> [String]
-    {
-        return self.string.components(separatedBy: .whitespaces)
-    }
-}
-
 private func printPrompt()
 {
     print("> ", terminator: "")
+}
+
+var hasError = false
+
+func reportError(at line: Int, message: String)
+{
+    report(at: line, location: "", message: message)
+}
+
+private func report(at line: Int, location: String, message: String)
+{
+    print("[line \(line)] Error \(location): \(message)")
+    hasError = true
+}
+
+enum LoxError : Error
+{
+    case interpretation
 }
