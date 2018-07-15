@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+config_f="${script_dir}/Ast.def"
+if [[ ! -f "${config_f}" ]]; then
+    echo "No input file found" >&2
+    exit 1
+fi
+
+output_f="${script_dir}/Expr.swift"
+
+"${script_dir}/"../../tool/emit_ast_entities.py "${config_f}" "${output_f}"

@@ -1,16 +1,38 @@
 import Foundation
 
-struct Token
+enum LiteralValue : Equatable
+{
+    case double(Double)
+    case string(String)
+}
+
+extension LiteralValue
+{
+    init?(value: Any)
+    {
+        if let string = value as? String {
+            self = .string(string)
+        }
+        else if let double = value as? Double {
+            self = .double(double)
+        }
+        else {
+            return nil
+        }
+    }
+}
+
+struct Token : Equatable
 {
     let kind: Kind
     let lexeme: String
-    let literal: Any?
+    let literal: LiteralValue?
     let line: Int
 }
 
 extension Token
 {
-    enum Kind
+    enum Kind : Equatable
     {
         // Single-character punctuation
         case leftParen, rightParen, leftBrace, rightBrace
@@ -59,6 +81,17 @@ extension Token.Kind
     }
 }
 
+extension LiteralValue
+{
+    var description: String
+    {
+        switch self {
+            case let .string(string): return string
+            case let .double(double): return double.description
+        }
+    }
+}
+
 extension Token
 {
     static func eof(_ line: Int) -> Token
@@ -68,6 +101,6 @@ extension Token
 
     var description: String
     {
-        return "\(self.kind) \(self.lexeme) \(self.literal ?? "")"
+        return "\(self.kind) \(self.lexeme) \(self.literal?.description ?? "")"
     }
 }

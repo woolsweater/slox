@@ -73,8 +73,9 @@ class LoxScanner
         }
     }
 
-    private func addToken(_ kind: Token.Kind, literal: Any? = nil)
+    private func addToken(_ kind: Token.Kind, rawLiteral: Any? = nil)
     {
+        let literal = rawLiteral.flatMap(LiteralValue.init)
         let newToken = Token(kind: kind,
                            lexeme: self.currentLexeme,
                           literal: literal,
@@ -177,7 +178,7 @@ class LoxScanner
         let stringContent = self.currentLexeme.dropFirst()
         // Include closing " in lexeme, but not contents
         self.advanceIndex()
-        self.addToken(.string, literal: stringContent)
+        self.addToken(.string, rawLiteral: stringContent)
     }
 
     private func readNumber()
@@ -193,7 +194,7 @@ class LoxScanner
             }
         }
 
-        self.addToken(.number, literal: Double(self.currentLexeme)!)
+        self.addToken(.number, rawLiteral: Double(self.currentLexeme)!)
     }
 
     private func readIdentifier()
