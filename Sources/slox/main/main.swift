@@ -1,3 +1,3 @@
 import Foundation
 
-exit(main(ProcessInfo.processInfo.arguments))
+exit(Lox.main(ProcessInfo.processInfo.arguments))

@@ -11,9 +11,9 @@ protocol ExprVisitor
     /** The product of this visitor's transform. */
     associatedtype Result
     func visit(_ literal: Literal) -> Result
-    func visit<E>(_ unary: Unary<E>) -> Result
-    func visit<L, R>(_ binary: Binary<L, R>) -> Result
-    func visit<E>(_ grouping: Grouping<E>) -> Result
+    func visit(_ unary: Unary) -> Result
+    func visit(_ binary: Binary) -> Result
+    func visit(_ grouping: Grouping) -> Result
 }
 
 /** A syntactic element in a Lox program. */
@@ -33,10 +33,10 @@ struct Literal : Expr
     }
 }
 
-struct Unary<E : Expr> : Expr
+struct Unary : Expr
 {
     let op: Token
-    let expr: E
+    let expr: Expr
     
     func accept<V : ExprVisitor>(visitor: V) -> V.Result
     {
@@ -44,11 +44,11 @@ struct Unary<E : Expr> : Expr
     }
 }
 
-struct Binary<L : Expr, R : Expr> : Expr
+struct Binary : Expr
 {
-    let left: L
+    let left: Expr
     let op: Token
-    let right: R
+    let right: Expr
     
     func accept<V : ExprVisitor>(visitor: V) -> V.Result
     {
@@ -56,9 +56,9 @@ struct Binary<L : Expr, R : Expr> : Expr
     }
 }
 
-struct Grouping<E : Expr> : Expr
+struct Grouping : Expr
 {
-    let expr: E
+    let expr: Expr
     
     func accept<V : ExprVisitor>(visitor: V) -> V.Result
     {

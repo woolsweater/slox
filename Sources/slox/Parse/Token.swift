@@ -4,6 +4,9 @@ enum LiteralValue : Equatable
 {
     case double(Double)
     case string(String)
+    case `false`
+    case `true`
+    case `nil`
 }
 
 extension LiteralValue
@@ -88,6 +91,9 @@ extension LiteralValue
         switch self {
             case let .string(string): return string
             case let .double(double): return double.description
+            case .false: return "false"
+            case .true: return "true"
+            case .nil: return "nil"
         }
     }
 }

@@ -68,14 +68,21 @@ class LoxScanner
             case \.isDigit: self.readNumber()
             case \.canStartIdentifier: self.readIdentifier()
             default:
-                reportError(at: self.lineNumber,
-                            message: "Unexpected character: \(char)")
+                self.reportScanError(message: "Unexpected character: \(char)")
         }
     }
 
     private func addToken(_ kind: Token.Kind, rawLiteral: Any? = nil)
     {
-        let literal = rawLiteral.flatMap(LiteralValue.init)
+        let literal: LiteralValue?
+        switch kind {
+            case .string:
+                literal = .string(rawLiteral as! String)
+            case .number:
+                literal = .double(rawLiteral as! Double)
+            default:
+                literal = rawLiteral.flatMap(LiteralValue.init)
+        }
         let newToken = Token(kind: kind,
                            lexeme: self.currentLexeme,
                           literal: literal,
@@ -150,8 +157,7 @@ class LoxScanner
         }
 
         guard !(self.isAtEnd) else {
-            reportError(at: self.lineNumber,
-                   message: "Expected '*/' to terminate comment")
+            self.reportScanError(message: "Expected '*/' to terminate comment")
             return
         }
 
@@ -170,13 +176,12 @@ class LoxScanner
         }
 
         guard !(self.isAtEnd) else {
-            reportError(at: self.lineNumber,
-                   message: "Unterminated string")
+            self.reportScanError(message: "Unterminated string")
             return
         }
 
-        let stringContent = self.currentLexeme.dropFirst()
-        // Include closing " in lexeme, but not contents
+        let stringContent = String(self.currentLexeme.dropFirst())
+        // Include closing " in lexeme, but not in the contents
         self.advanceIndex()
         self.addToken(.string, rawLiteral: stringContent)
     }
@@ -205,6 +210,11 @@ class LoxScanner
 
         let kind = Token.Kind(keyword: self.currentLexeme) ?? .identifier
         self.addToken(kind)
+    }
+
+    private func reportScanError(message: String)
+    {
+        Lox.report(at: self.lineNumber, location: "", message: message)
     }
 }
 

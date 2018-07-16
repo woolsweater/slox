@@ -1,73 +1,80 @@
 import Foundation
 
-func main(_ args: [String]) -> Int32
+class Lox
 {
-    let args = Array(args.dropFirst())
+    static private(set) var hasError = false
 
-    guard args.count <= 1 else {
-        return ExitCode.badUsage.returnValue
+    static func main(_ args: [String]) -> Int32
+    {
+        let args = Array(args.dropFirst())
+
+        guard args.count <= 1 else {
+            return ExitCode.badUsage.returnValue
+        }
+
+        if let path = args.first {
+            do { try self.runFile(path) }
+            catch LoxError.interpretation { return ExitCode.interpreterFailure.returnValue }
+            catch { return ExitCode.badInput.returnValue }
+        }
+        else {
+            self.runPrompt()
+        }
+
+        return 0
     }
 
-    if let path = args.first {
-        do { try runFile(path) }
-        catch LoxError.interpretation { return ExitCode.interpreterFailure.returnValue }
-        catch { return ExitCode.badInput.returnValue }
-    }
-    else {
-        runPrompt()
+    static func report(at line: Int, location: String, message: String)
+    {
+        print("[line \(line)] Error \(location): \(message)")
+        hasError = true
     }
 
-    return 0
-}
-
-private func runFile(_ path: String) throws
-{
-    let contents = try String(contentsOfFile: path, encoding: .utf8)
-    run(contents)
-    if hasError {
-        throw LoxError.interpretation
+    private enum LoxError : Error
+    {
+        case interpretation
     }
-}
 
-private func runPrompt()
-{
-    printPrompt()
-    while let line = readLine() {
-        run(line)
-        hasError = false
-        printPrompt()
+    private static func runFile(_ path: String) throws
+    {
+        let contents = try String(contentsOfFile: path, encoding: .utf8)
+        self.run(contents)
+        if self.hasError {
+            throw LoxError.interpretation
+        }
     }
-}
 
-private func run(_ source: String)
-{
-    let scanner = LoxScanner(source: source)
-    let tokens = scanner.scanTokens()
-
-    for token in tokens {
-        print(token)
+    private static func runPrompt()
+    {
+        self.printPrompt()
+        while let line = readLine() {
+            self.run(line)
+            self.hasError = false
+            self.printPrompt()
+        }
     }
-}
 
-private func printPrompt()
-{
-    print("> ", terminator: "")
-}
+    private static func run(_ source: String)
+    {
+        let scanner = LoxScanner(source: source)
+        let tokens = scanner.scanTokens()
 
-var hasError = false
+        let parser = Parser(tokens: tokens)
+        guard
+            let expr = parser.parse(),
+            !self.hasError else
+        {
+            print("Parsing failed")
+            return
+        }
 
-func reportError(at line: Int, message: String)
-{
-    report(at: line, location: "", message: message)
-}
+        let renderer = AstParenRenderer(ast: expr)
+        print(renderer.renderAst())
+    }
 
-private func report(at line: Int, location: String, message: String)
-{
-    print("[line \(line)] Error \(location): \(message)")
-    hasError = true
-}
+    private static func printPrompt()
+    {
+        print("> ", terminator: "")
+    }
 
-enum LoxError : Error
-{
-    case interpretation
 }

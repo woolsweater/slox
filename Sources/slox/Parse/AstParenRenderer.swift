@@ -19,12 +19,12 @@ class AstParenRenderer : ExprVisitor
         return literal.value.description
     }
 
-    func visit<E>(_ unary: Unary<E>) -> String
+    func visit(_ unary: Unary) -> String
     {
         return self.parenthesize(unary.op.lexeme, unary.expr)
     }
 
-    func visit<L, R>(_ binary: Binary<L, R>) -> String
+    func visit(_ binary: Binary) -> String
     {
         return self.parenthesize(
             binary.op.lexeme,
@@ -33,7 +33,7 @@ class AstParenRenderer : ExprVisitor
         )
     }
 
-    func visit<E>(_ grouping: Grouping<E>) -> String
+    func visit(_ grouping: Grouping) -> String
     {
         return self.parenthesize("G", grouping.expr)
     }
