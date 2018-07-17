@@ -121,9 +121,9 @@ class LoxScanner
         return self.source[self.currentSourceIndex]
     }
 
-    private func peekAfter() -> Character
+    private func peekAfter() -> Character?
     {
-        guard self.nextIndex < self.source.endIndex else { return "\0" }
+        guard self.nextIndex < self.source.endIndex else { return nil }
         return self.source[self.nextIndex]
     }
 
@@ -192,7 +192,7 @@ class LoxScanner
             self.advanceIndex()
         }
 
-        if self.peek() == "." && self.peekAfter().isDigit {
+        if self.peek() == "." && self.peekAfter()?.isDigit == true {
             self.advanceIndex()
             while self.peek()?.isDigit == true {
                 self.advanceIndex()

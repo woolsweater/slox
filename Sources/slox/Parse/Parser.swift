@@ -31,6 +31,10 @@ class Parser
             return nil
         }
 
+        if !(self.isAtEnd) {
+            _ = self.reportParseError(message: "Excess tokens in input")
+        }
+
         return expr
 
     }
@@ -107,8 +111,8 @@ class Parser
 
     private func primary() throws -> Expr
     {
-        if self.matchAny(.false) { return Literal(value: .false) }
-        if self.matchAny(.true) { return Literal(value: .true) }
+        if self.matchAny(.false) { return Literal(value: .bool(false)) }
+        if self.matchAny(.true) { return Literal(value: .bool(true)) }
         if self.matchAny(.nil) { return Literal(value: .nil) }
 
         if self.matchAny(.number, .string) {
@@ -117,7 +121,9 @@ class Parser
 
         if self.matchAny(.leftParen) {
             let expr = try self.expression()
-            try self.mustConsume(.rightParen, message: "Expected ')' to match earlier '('")
+            try self.mustConsume(.rightParen,
+                                 message: "Expected ')' to match earlier '('")
+            self.matchBadToken(.rightParen)
             return Grouping(expr: expr)
         }
 
@@ -142,6 +148,15 @@ class Parser
     {
         guard !(self.isAtEnd) else { return false }
         return self.peek().kind == kind
+    }
+
+    /** Check for an error production; consume and report it if found */
+    private func matchBadToken(_ kind: Token.Kind)
+    {
+        guard !(self.isAtEnd) else { return }
+        if self.matchAny(kind) {
+            _ = self.reportParseError(message: "Misplaced \(kind) token")
+        }
     }
 
     private func peek() -> Token
