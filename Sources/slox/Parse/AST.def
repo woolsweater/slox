@@ -1,4 +1,0 @@
-Literal ~ value: LiteralValue
-Unary ~ op: Token, expr: Expr
-Binary ~ left: Expr, op: Token, right: Expr
-Grouping ~ expr: Expr

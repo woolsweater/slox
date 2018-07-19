@@ -20,9 +20,9 @@ class Parser
         self.tokens = tokens
     }
 
-    func parse() -> Expr?
+    func parse() -> Expression?
     {
-        let expr: Expr
+        let expr: Expression
 
         do { expr = try self.expression() }
         catch {
@@ -41,82 +41,82 @@ class Parser
 
     //MARK:- Grammar rules
 
-    private func expression() throws -> Expr
+    private func expression() throws -> Expression
     {
         return try self.equality()
     }
 
-    private func equality() throws -> Expr
+    private func equality() throws -> Expression
     {
         var expr = try self.comparison()
 
         while self.matchAny(.bangEqual, .equalEqual) {
             let op = self.previous
             let right = try self.comparison()
-            expr = Binary(left: expr, op: op, right: right)
+            expr = .binary(left: expr, op: op, right: right)
         }
 
         return expr
     }
 
-    private func comparison() throws -> Expr
+    private func comparison() throws -> Expression
     {
         var expr = try self.addition()
 
         while self.matchAny(.greater, .greaterEqual, .less, .lessEqual) {
             let op = self.previous
             let right = try self.addition()
-            expr = Binary(left: expr, op: op, right: right)
+            expr = .binary(left: expr, op: op, right: right)
         }
 
         return expr
     }
 
-    private func addition() throws -> Expr
+    private func addition() throws -> Expression
     {
         var expr = try self.multiplication()
 
         while self.matchAny(.minus, .plus) {
             let op = self.previous
             let right = try self.multiplication()
-            expr = Binary(left: expr, op: op, right: right)
+            expr = .binary(left: expr, op: op, right: right)
         }
 
         return expr
     }
 
-    private func multiplication() throws -> Expr
+    private func multiplication() throws -> Expression
     {
         var expr = try self.unary()
 
         while self.matchAny(.slash, .star) {
             let op = self.previous
             let right = try self.unary()
-            expr = Binary(left: expr, op: op, right: right)
+            expr = .binary(left: expr, op: op, right: right)
         }
 
         return expr
     }
 
-    private func unary() throws -> Expr
+    private func unary() throws -> Expression
     {
         guard self.matchAny(.bang, .minus) else {
             return try self.primary()
         }
 
         let op = self.previous
-        let right = try self.unary()
-        return Unary(op: op, expr: right)
+        let subexpr = try self.unary()
+        return .unary(op: op, subexpr)
     }
 
-    private func primary() throws -> Expr
+    private func primary() throws -> Expression
     {
-        if self.matchAny(.false) { return Literal(value: .bool(false)) }
-        if self.matchAny(.true) { return Literal(value: .bool(true)) }
-        if self.matchAny(.nil) { return Literal(value: .nil) }
+        if self.matchAny(.false) { return .literal(.bool(false)) }
+        if self.matchAny(.true) { return .literal(.bool(true)) }
+        if self.matchAny(.nil) { return .literal(.nil) }
 
         if self.matchAny(.number, .string) {
-            return Literal(value: self.previous.literal!)
+            return .literal(self.previous.literal!)
         }
 
         if self.matchAny(.leftParen) {
@@ -124,7 +124,7 @@ class Parser
             try self.mustConsume(.rightParen,
                                  message: "Expected ')' to match earlier '('")
             self.matchBadToken(.rightParen)
-            return Grouping(expr: expr)
+            return .grouping(expr)
         }
 
         throw self.reportParseError(message: "No expression found")

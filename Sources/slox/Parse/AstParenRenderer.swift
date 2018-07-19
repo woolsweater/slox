@@ -1,47 +1,37 @@
 import Foundation
 
-class AstParenRenderer : ExprVisitor
+class AstParenRenderer : ExpressionReader
 {
-    private let ast: Expr
+    private let ast: Expression
 
-    init(ast: Expr)
+    init(ast: Expression)
     {
         self.ast = ast
     }
 
     func renderAst() -> String
     {
-        return self.ast.accept(visitor: self)
+        return self.read(self.ast)
     }
 
-    func visit(_ literal: Literal) -> String
+    func read(_ expression: Expression) -> String
     {
-        return literal.value.description
+        switch expression {
+            case let .literal(value):
+                return value.description
+            case let .unary(op: op, subexpression):
+                return self.parenthesize(op.lexeme, subexpression)
+            case let .binary(left: leftSubexpression, op: op, right: rightSubexpression):
+                return self.parenthesize(op.lexeme, leftSubexpression, rightSubexpression)
+            case let .grouping(subexpression):
+                return self.parenthesize("G", subexpression)
+        }
     }
 
-    func visit(_ unary: Unary) -> String
-    {
-        return self.parenthesize(unary.op.lexeme, unary.expr)
-    }
-
-    func visit(_ binary: Binary) -> String
-    {
-        return self.parenthesize(
-            binary.op.lexeme,
-            binary.left,
-            binary.right
-        )
-    }
-
-    func visit(_ grouping: Grouping) -> String
-    {
-        return self.parenthesize("G", grouping.expr)
-    }
-
-    private func parenthesize(_ name: String, _ exprs: Expr...) -> String
+    private func parenthesize(_ name: String, _ exprs: Expression...) -> String
     {
         let description = exprs.reduce(into: "\(name)") {
-            (string, next) in string += " \(next.accept(visitor: self))"
+            (string, next) in string += " \(self.read(next))"
         }
         return "(" + description + ")"
     }

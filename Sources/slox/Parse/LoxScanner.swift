@@ -74,15 +74,7 @@ class LoxScanner
 
     private func addToken(_ kind: Token.Kind, rawLiteral: Any? = nil)
     {
-        let literal: LiteralValue?
-        switch kind {
-            case .string:
-                literal = .string(rawLiteral as! String)
-            case .number:
-                literal = .double(rawLiteral as! Double)
-            default:
-                literal = rawLiteral.flatMap(LiteralValue.init)
-        }
+        let literal = rawLiteral.flatMap(LiteralValue.init)
         let newToken = Token(kind: kind,
                            lexeme: self.currentLexeme,
                           literal: literal,
