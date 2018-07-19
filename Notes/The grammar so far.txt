@@ -1,4 +1,5 @@
-expression     → equality ;
+expression     → joined ;
+joined         → equality ( "," equality ) ;
 equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
 addition       → multiplication ( ( "-" | "+" ) multiplication )* ;

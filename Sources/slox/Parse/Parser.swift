@@ -43,7 +43,20 @@ class Parser
 
     private func expression() throws -> Expression
     {
-        return try self.equality()
+        return try self.joined()
+    }
+
+    private func joined() throws -> Expression
+    {
+        var expr = try self.equality()
+
+        while self.matchAny(.comma) {
+            let op = self.previous
+            let right = try self.equality()
+            expr = .binary(left: expr, op: op, right: right)
+        }
+
+        return expr
     }
 
     private func equality() throws -> Expression
