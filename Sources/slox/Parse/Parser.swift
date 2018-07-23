@@ -48,6 +48,11 @@ class Parser
 
     private func joined() throws -> Expression
     {
+        if self.matchAny(.comma) {
+            _ = self.reportParseError(message: "missing lefthand expression")
+            return try self.joined()
+        }
+
         var expr = try self.equality()
 
         while self.matchAny(.comma) {
@@ -61,6 +66,11 @@ class Parser
 
     private func equality() throws -> Expression
     {
+        if self.matchAny(.bangEqual, .equalEqual) {
+            _ = self.reportParseError(message: "missing lefthand expression")
+            return try self.equality()
+        }
+
         var expr = try self.comparison()
 
         while self.matchAny(.bangEqual, .equalEqual) {
@@ -74,6 +84,11 @@ class Parser
 
     private func comparison() throws -> Expression
     {
+        if self.matchAny(.greater, .greaterEqual, .less, .lessEqual) {
+            _ = self.reportParseError(message: "missing lefthand expression")
+            return try self.comparison()
+        }
+
         var expr = try self.addition()
 
         while self.matchAny(.greater, .greaterEqual, .less, .lessEqual) {
@@ -87,6 +102,11 @@ class Parser
 
     private func addition() throws -> Expression
     {
+        if self.matchAny(.minus, .plus) {
+            _ = self.reportParseError(message: "missing lefthand expression")
+            return try self.addition()
+        }
+
         var expr = try self.multiplication()
 
         while self.matchAny(.minus, .plus) {

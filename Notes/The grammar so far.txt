@@ -1,9 +1,19 @@
 expression     → joined ;
-joined         → equality ( "," equality ) ;
-equality       → comparison ( ( "!=" | "==" ) comparison )* ;
-comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )* ;
-addition       → multiplication ( ( "-" | "+" ) multiplication )* ;
-multiplication → unary ( ( "/" | "*" ) unary )* ;
+joined         → equality ( "," equality )
+               | join-error ;
+join-error     → "," joined ;
+equality       → comparison ( ( "!=" | "==" ) comparison )*
+               | equal-error ;
+equal-error    → ( "!=" | "==" ) equality ;
+comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )*
+               | compare-error ;
+compare-error  → ( ">" | ">=" | "<" | "<=" ) comparison ;
+addition       → multiplication ( ( "-" | "+" ) multiplication )*
+               | add-error ;
+add-error      → ( "-" | "+" ) addition ;
+multiplication → unary ( ( "/" | "*" ) unary )* 
+               | multply-error ;
+multply-error  → ( "/" | "*" ) multiplication ;
 unary          → "!" ("!")* boolean
                | "-" ("-")* NUMBER
                | primary ;

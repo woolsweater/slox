@@ -31,7 +31,6 @@ typealias Parser = (inout [Token]) -> Expr
 
 func binaryParser(followedBy nextParser: @escaping Parser, ops: Token.Kind...) -> Parser {
     return { (tokens) in
-        var tokens = tokens
         var expr = nextParser(&tokens)
 
         while let op = matchAny(&tokens, ops) {
@@ -41,6 +40,32 @@ func binaryParser(followedBy nextParser: @escaping Parser, ops: Token.Kind...) -
 
         return expr
     }
+}
+
+func binaryParserWithError(followedBy nextParser: @escaping Parser, ops: Token.Kind...) -> Parser {
+    var production: Parser!
+
+    let errorProduction: Parser = { [production] (tokens: inout [Token]) in
+        guard matchAny(&tokens, ops) == nil else {
+            // Report error
+            return production!(&tokens)
+        }
+
+        var expr = nextParser(&tokens)
+
+        while let op = matchAny(&tokens, ops) {
+            let right = nextParser(&tokens)
+            expr = Binary(left: expr, op: op, right: right)
+        }
+
+        return expr
+    }
+
+    production = { (tokens: inout [Token]) in
+        return errorProduction(&tokens)
+    }
+
+    return production
 }
 
 func matchAny(_ tokens: inout [Token], _ ops: [Token.Kind]) -> Token? {
