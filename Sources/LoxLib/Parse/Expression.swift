@@ -16,7 +16,7 @@ protocol ExpressionReader
 }
 
 /** An element of Lox grammar. */
-indirect enum Expression
+indirect enum Expression : Equatable
 {
     /** A "primary" expression that consists of a single value. */
     case literal(LiteralValue)

@@ -1,10 +1,10 @@
 import Foundation
 
-class Lox
+public class Lox
 {
-    static private(set) var hasError = false
+    private(set) static var hasError = false
 
-    static func main(_ args: [String]) -> Int32
+    public static func main(_ args: [String]) -> Int32
     {
         let args = Array(args.dropFirst())
 
