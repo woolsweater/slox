@@ -24,6 +24,11 @@ public class Lox
         return 0
     }
 
+    static func clearError()
+    {
+        self.hasError = false
+    }
+
     static func report(at line: Int, location: String, message: String)
     {
         print("[line \(line)] Error \(location): \(message)")
@@ -49,7 +54,7 @@ public class Lox
         self.printPrompt()
         while let line = readLine() {
             self.run(line)
-            self.hasError = false
+            self.clearError()
             self.printPrompt()
         }
     }
@@ -76,5 +81,4 @@ public class Lox
     {
         print("> ", terminator: "")
     }
-
 }
