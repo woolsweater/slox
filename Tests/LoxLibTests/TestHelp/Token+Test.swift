@@ -2,6 +2,9 @@
 
 extension Token.Kind
 {
+    /**
+     Given a punctuation `Kind`, return the represented string.
+     */
     var lexeme: String
     {
         switch self {
@@ -12,6 +15,8 @@ extension Token.Kind
             case .plus: return "+"
             case .slash: return "/"
             case .star: return "*"
+            case .equalEqual: return "=="
+            case .bangEqual: return "!="
             default:
                 fatalError("Not implemented yet")
         }
@@ -20,25 +25,27 @@ extension Token.Kind
 
 extension Token
 {
-    init(string: String)
+    init(string: String, at line: Int = 1)
     {
         self.init(kind: .string,
                 lexeme: string,
                literal: .string(string),
-                  line: 1)
+                  line: line)
     }
 
-    init(number: Double)
+    init(number: Double, at line: Int = 1)
     {
         self.init(kind: .number,
                 lexeme: String(number),
                literal: .double(number),
-                  line: 1)
+                  line: line)
     }
 
-    init(punctuation: Kind)
+    init(punctuation: Kind, at line: Int = 1)
     {
-        let lexeme = punctuation.lexeme
-        self.init(kind: punctuation, lexeme: lexeme, literal: nil, line: 1)
+        self.init(kind: punctuation,
+                lexeme: punctuation.lexeme,
+               literal: nil,
+                  line: line)
     }
 }
