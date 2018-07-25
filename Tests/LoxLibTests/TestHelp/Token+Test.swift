@@ -3,11 +3,13 @@
 extension Token.Kind
 {
     /**
-     Given a punctuation `Kind`, return the represented string.
+     Given a `Kind` with a single possible `String` value,
+     return the represented string.
      */
     var lexeme: String
     {
         switch self {
+            // Punctuation
             case .leftParen: return "("
             case .rightParen: return ")"
             case .comma: return ","
@@ -17,6 +19,10 @@ extension Token.Kind
             case .star: return "*"
             case .equalEqual: return "=="
             case .bangEqual: return "!="
+            // Keywords
+            case .false: return "false"
+            case .true: return "true"
+            case .nil: return "nil"
             default:
                 fatalError("Not implemented yet")
         }
@@ -25,6 +31,9 @@ extension Token.Kind
 
 extension Token
 {
+    static let leftParen = Token(punctuation: .leftParen)
+    static let rightParen = Token(punctuation: .rightParen)
+
     init(string: String, at line: Int = 1)
     {
         self.init(kind: .string,
@@ -45,6 +54,14 @@ extension Token
     {
         self.init(kind: punctuation,
                 lexeme: punctuation.lexeme,
+               literal: nil,
+                  line: line)
+    }
+
+    init(keyword: Kind, at line: Int = 1)
+    {
+        self.init(kind: keyword,
+                lexeme: keyword.lexeme,
                literal: nil,
                   line: line)
     }

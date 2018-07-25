@@ -25,11 +25,7 @@ class ParserTests : LoxTestCase
 
         let parser = Parser(tokens: tokens)
 
-        guard let parsed = parser.parse() else {
-            XCTFail(); return
-        }
-
-        XCTAssertEqual(expression, parsed)
+        XCTAssertEqual(expression, parser.parse())
     }
 
     /**
@@ -49,13 +45,13 @@ class ParserTests : LoxTestCase
             Token(string: "world!"),
         ]
         let tokens : [Token] = [
-            Token(punctuation: .leftParen), ] +
+            Token.leftParen, ] +
             firstGroup + [
-            Token(punctuation: .rightParen),
+            Token.rightParen,
             Token(punctuation: .comma),
-            Token(punctuation: .leftParen), ] +
+            Token.leftParen, ] +
             secondGroup + [
-            Token(punctuation: .rightParen),
+            Token.rightParen,
             Token.eof(1)
         ]
 
@@ -79,11 +75,7 @@ class ParserTests : LoxTestCase
 
         let parser = Parser(tokens: tokens)
 
-        guard let parsed = parser.parse() else {
-            XCTFail(); return
-        }
-
-        XCTAssertEqual(expression, parsed)
+        XCTAssertEqual(expression, parser.parse())
     }
 
     /**
@@ -102,11 +94,7 @@ class ParserTests : LoxTestCase
 
         let parser = Parser(tokens: tokens)
 
-        guard let parsed = parser.parse() else {
-            XCTFail(); return
-        }
-
-        XCTAssertEqual(expression, parsed)
+        XCTAssertEqual(expression, parser.parse())
         XCTAssertTrue(Lox.hasError)
     }
 
@@ -134,11 +122,7 @@ class ParserTests : LoxTestCase
 
             let parser = Parser(tokens: tokens)
 
-            guard let parsed = parser.parse() else {
-                XCTFail(); return
-            }
-
-            XCTAssertEqual(expression, parsed)
+            XCTAssertEqual(expression, parser.parse())
         }
     }
 
@@ -162,9 +146,9 @@ class ParserTests : LoxTestCase
 
         for equalOp in [Token(punctuation: .equalEqual), Token(punctuation: .bangEqual)] {
             let tokens = [
-                Token(punctuation: .leftParen), ] +
+                Token.leftParen, ] +
                 firstGroup + [
-                Token(punctuation: .rightParen),
+                Token.rightParen,
                 equalOp, ] +
                 secondGroup + [
                 Token.eof(1)
@@ -188,11 +172,7 @@ class ParserTests : LoxTestCase
 
             let parser = Parser(tokens: tokens)
 
-            guard let parsed = parser.parse() else {
-                XCTFail(); return
-            }
-
-            XCTAssertEqual(expression, parsed)
+            XCTAssertEqual(expression, parser.parse())
         }
     }
 
@@ -214,11 +194,118 @@ class ParserTests : LoxTestCase
 
             let parser = Parser(tokens: tokens)
 
-            guard let parsed = parser.parse() else {
-                XCTFail(); return
-            }
-
-            XCTAssertEqual(expression, parsed)
+            XCTAssertEqual(expression, parser.parse())
         }
+    }
+
+    //MARK:- Primary
+
+    /**
+     Verify the expression produced when parsing a single keyword token,
+     such as `true` or `nil`.
+     */
+    func testPrimaryKeyword()
+    {
+        let keywordsAndExpressions: [(Token, Expression)] = [
+            (Token(keyword: .false), Expression.false),
+            (Token(keyword: .true), Expression.true),
+            (Token(keyword: .nil), Expression.nil),
+        ]
+
+        for (keyword, expression) in keywordsAndExpressions {
+            let parser = Parser(tokens: [keyword, Token.eof(1)])
+            XCTAssertEqual(expression, parser.parse())
+        }
+    }
+
+    /**
+     Verify the expression produced when parsing a string token.
+     */
+    func testPrimaryStrings()
+    {
+        let string = "Hello, world!"
+        let token = Token(string: string)
+        let expression = Expression(string: string)
+
+        let parser = Parser(tokens: [token, Token.eof(1)])
+
+        XCTAssertEqual(expression, parser.parse())
+    }
+
+    /**
+     Verify the expression produced when parsing a number token.
+     */
+    func testPrimaryNumbers()
+    {
+        let number: Double = 1024
+        let token = Token(number: number)
+        let expression = Expression(number: number)
+
+        let parser = Parser(tokens: [token, Token.eof(1)])
+
+        XCTAssertEqual(expression, parser.parse())
+    }
+
+    /**
+     Verify the expression produced when parsing a grouping composed of
+     another primary.
+     */
+    func testPrimaryGrouping()
+    {
+        let number: Double = 10
+        let tokens = [
+            Token.leftParen,
+            Token(number: number),
+            Token.rightParen,
+            Token.eof(1)
+        ]
+        let expression = Expression.grouping(Expression(number: number))
+
+        let parser = Parser(tokens: tokens)
+
+        XCTAssertEqual(expression, parser.parse())
+    }
+
+    /**
+     Verify that a grouping that is missing its closing parenthesis
+     causes parsing to fail.
+     */
+    func testPrimaryUntermiatedGrouping()
+    {
+        let tokens = [
+            Token.leftParen,
+            Token(number: 10),
+            Token.eof(1)
+        ]
+
+        let parser = Parser(tokens: tokens)
+
+        XCTAssertNil(parser.parse())
+        XCTAssertTrue(Lox.hasError)
+
+    }
+
+    /**
+     Verify the expression produced when parsing a grouping with an extra
+     trailing parenthesis.
+     - remark: The grouping exprssion should be parsed and returned, but
+     an error should be reported.
+     */
+    func testPrimaryGroupingError()
+    {
+        let number: Double = 10
+        let tokens = [
+            Token.leftParen,
+            Token(number: number),
+            Token.rightParen,
+            Token.rightParen,
+            Token.eof(1)
+        ]
+        let expression = Expression.grouping(Expression(number: number))
+
+        let parser = Parser(tokens: tokens)
+
+        XCTAssertEqual(expression, parser.parse())
+        XCTAssertTrue(Lox.hasError)
     }
 }
