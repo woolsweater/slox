@@ -4,6 +4,8 @@ public class Lox
 {
     private(set) static var hasError = false
 
+    private static let interpreter = Interpreter()
+
     public static func main(_ args: [String]) -> Int32
     {
         let args = Array(args.dropFirst())
@@ -73,8 +75,7 @@ public class Lox
             return
         }
 
-        let renderer = AstParenRenderer(ast: expr)
-        print(renderer.renderAst())
+        self.interpreter.interpret(expr)
     }
 
     private static func printPrompt()
