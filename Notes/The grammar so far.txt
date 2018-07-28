@@ -10,7 +10,7 @@ comparison     → addition ( ( ">" | ">=" | "<" | "<=" ) addition )*
 compare-error  → ( ">" | ">=" | "<" | "<=" ) comparison ;
 addition       → multiplication ( ( "-" | "+" ) multiplication )*
                | add-error ;
-add-error      → ( "-" | "+" ) addition ;
+add-error      → ( "+" ) addition ;
 multiplication → unary ( ( "/" | "*" ) unary )* 
                | multply-error ;
 multiply-error → ( "/" | "*" ) multiplication ;
