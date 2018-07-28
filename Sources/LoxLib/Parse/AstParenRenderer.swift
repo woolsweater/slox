@@ -25,6 +25,8 @@ class AstParenRenderer
                 return self.parenthesize(op.lexeme, leftSubexpression, rightSubexpression)
             case let .grouping(subexpression):
                 return self.parenthesize("G", subexpression)
+            case let .variable(name):
+                return "${\(name.lexeme)}"
         }
     }
 

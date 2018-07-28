@@ -2,6 +2,8 @@ import Foundation
 
 class Interpreter
 {
+    private let environment = Environment()
+
     func interpret(_ program: [Statement]) {
         do {
             for statement in program {
@@ -24,6 +26,8 @@ class Interpreter
                 print(self.stringify(value))
             case let .expression(expression):
                 _ = try self.evaluate(expression)
+            case let .variableDecl(name: name, initializer: expression):
+                try self.evaluateVariableDecl(name: name, initializer: expression)
         }
     }
 
@@ -40,7 +44,15 @@ class Interpreter
                                                rightExpr: right)
             case let .grouping(groupedExpression):
                 return try self.evaluate(groupedExpression)
+            case let .variable(name: name):
+                return try self.environment.read(variable: name)
         }
+    }
+
+    private func evaluateVariableDecl(name: Token, initializer: Expression?) throws
+    {
+        let value = try initializer.flatMap(self.evaluate)
+        self.environment.define(name: name.lexeme, value: value)
     }
 
     private func interpretLiteral(_ value: LiteralValue) -> Any?
@@ -185,12 +197,6 @@ class Interpreter
              location: "at \(locationDescription)",
               message: error.message)
     }
-}
-
-private struct RuntimeError : Error
-{
-    let token: Token
-    let message: String
 }
 
 private extension RuntimeError

@@ -1,4 +1,9 @@
-program        → statement* EOF ;
+program        → declaration* EOF ;
+
+declaration    → varDecl
+               | statement ;
+
+varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 
 statement      → exprStmt
                | printStmt ;
@@ -25,4 +30,5 @@ unary          → "!" ("!")* unary
                | "-" ("-")* unary
                | primary ;
 primary        → NUMBER | STRING | boolean | "nil"
-               | "(" expression ")" ;
+               | "(" expression ")"
+               | IDENTIFIER ;

@@ -1,0 +1,14 @@
+var a = 10;
+
+print a;
+
+// Legal to change value
+var a = 12;
+
+// Copy
+var b = a;
+
+// Change again
+var a = 21;
+
+print b;    // Does not reference new 'a' value

@@ -11,6 +11,11 @@ indirect enum Expression : Equatable
     case binary(left: Expression, op: Token, right: Expression)
     /** An expression that was set off by parentheses in the source code. */
     case grouping(Expression)
+    /**
+     An expression referring to a variable, that evaluates to the variable's
+     stored value.
+     */
+    case variable(name: Token)
 }
 
 enum Statement : Equatable
@@ -19,4 +24,6 @@ enum Statement : Equatable
     case expression(Expression)
     /** A statement for displaying an expression as output to the user. */
     case print(Expression)
+    /** A statement declaring a variable. An initial value may be provided. */
+    case variableDecl(name: Token, initializer: Expression?)
 }

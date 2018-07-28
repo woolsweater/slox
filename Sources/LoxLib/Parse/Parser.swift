@@ -24,15 +24,11 @@ class Parser
     {
         var statements: [Statement] = []
 
-        do {
-            while !(self.isAtEnd) {
-                try statements.append(self.statement())
+        while !(self.isAtEnd) {
+            guard let decl = self.declaration() else {
+                continue
             }
-        }
-        catch {
-            //TODO: Apply synchronize
-            // self.synchronize()
-            return nil
+            statements.append(decl)
         }
 
         return statements
@@ -40,6 +36,35 @@ class Parser
     }
 
     //MARK:- Grammar rules
+
+    private func declaration() -> Statement?
+    {
+        do {
+            if self.matchAny(.var) {
+                return try self.variableDecl()
+            }
+            else {
+                return try self.statement()
+            }
+        }
+        catch {
+            self.synchronize()
+            return nil
+        }
+    }
+
+    private func variableDecl() throws -> Statement
+    {
+        try self.mustConsume(.identifier, message: "Expected an identifier in variable declaration.")
+
+        let name = self.previous
+
+        let initializer = self.matchAny(.equal) ? try self.expression() : nil
+
+        try self.mustConsume(.semicolon, message: "Expected ';' after variable declaration.")
+
+        return .variableDecl(name: name, initializer: initializer)
+    }
 
     private func statement() throws -> Statement
     {
@@ -175,6 +200,10 @@ class Parser
 
         if self.matchAny(.number, .string) {
             return .literal(self.previous.literal!)
+        }
+
+        if self.matchAny(.identifier) {
+            return .variable(name: self.previous)
         }
 
         if self.matchAny(.leftParen) {
