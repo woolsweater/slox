@@ -17,6 +17,7 @@ extension Token.Kind
             case .plus: return "+"
             case .slash: return "/"
             case .star: return "*"
+            case .bang: return "!"
             case .equalEqual: return "=="
             case .bangEqual: return "!="
             // Keywords
@@ -24,7 +25,7 @@ extension Token.Kind
             case .true: return "true"
             case .nil: return "nil"
             default:
-                fatalError("Not implemented yet")
+                fatalError("Not implemented yet: \(self)")
         }
     }
 }

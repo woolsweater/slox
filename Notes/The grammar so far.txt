@@ -13,10 +13,9 @@ addition       → multiplication ( ( "-" | "+" ) multiplication )*
 add-error      → ( "-" | "+" ) addition ;
 multiplication → unary ( ( "/" | "*" ) unary )* 
                | multply-error ;
-multply-error  → ( "/" | "*" ) multiplication ;
-unary          → "!" ("!")* boolean
-               | "-" ("-")* NUMBER
+multiply-error → ( "/" | "*" ) multiplication ;
+unary          → "!" ("!")* unary
+               | "-" ("-")* unary
                | primary ;
-boolean        → "false" | "true"
 primary        → NUMBER | STRING | boolean | "nil"
                | "(" expression ")" ;
