@@ -20,26 +20,51 @@ class Parser
         self.tokens = tokens
     }
 
-    func parse() -> Expression?
+    func parse() -> [Statement]?
     {
-        let expr: Expression
+        var statements: [Statement] = []
 
-        do { expr = try self.expression() }
+        do {
+            while !(self.isAtEnd) {
+                try statements.append(self.statement())
+            }
+        }
         catch {
             //TODO: Apply synchronize
             // self.synchronize()
             return nil
         }
 
-        if !(self.isAtEnd) {
-            _ = self.reportParseError(message: "Excess tokens in input")
-        }
-
-        return expr
+        return statements
 
     }
 
     //MARK:- Grammar rules
+
+    private func statement() throws -> Statement
+    {
+        if self.matchAny(.print) {
+            return try self.finishPrintStatement()
+        }
+
+        return try self.finishExpressionStatement()
+    }
+
+    private func finishPrintStatement() throws -> Statement
+    {
+        let expression = try self.expression()
+        try self.mustConsume(.semicolon,
+                             message: "Expected ';' to terminate print statement.")
+        return .print(expression)
+    }
+
+    private func finishExpressionStatement() throws -> Statement
+    {
+        let expression = try self.expression()
+        try self.mustConsume(.semicolon,
+                             message: "Expected ';' to terminate expression.")
+        return .expression(expression)
+    }
 
     private func expression() throws -> Expression
     {

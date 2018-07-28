@@ -1,0 +1,13 @@
+print "hello, world!";
+print ((10 * 2) / 3) + (100 - 9);
+print ((10 * 2) / 3) + (100 - 9) < 500;
+print "This is a multiline string.
+That's pretty cool, I think.
+...
+Don't you?";
+
+// Comments are ignored; isn't it great?
+"Not part of a print statment";
+        (10 * 2);    // Leading whitespace is insignificant, too
+
+        print ("10");

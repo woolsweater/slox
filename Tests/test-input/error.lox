@@ -1,0 +1,3 @@
+print "This doesn't parse
+10 * 10
+print "ducks!";

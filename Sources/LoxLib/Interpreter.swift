@@ -2,15 +2,28 @@ import Foundation
 
 class Interpreter
 {
-    func interpret(_ tree: Expression) {
+    func interpret(_ program: [Statement]) {
         do {
-            let value = try self.evaluate(tree)
-            print(self.stringify(value))
+            for statement in program {
+                try self.execute(statement)
+            }
         }
         catch let error as RuntimeError {
             self.reportRuntimeError(error)
-        } catch {
+        }
+        catch {
             fatalError("Unknown interpretation failure")
+        }
+    }
+
+    private func execute(_ statement: Statement) throws
+    {
+        switch statement {
+            case let .print(expression):
+                let value = try self.evaluate(expression)
+                print(self.stringify(value))
+            case let .expression(expression):
+                _ = try self.evaluate(expression)
         }
     }
 

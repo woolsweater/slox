@@ -1,6 +1,6 @@
 import Foundation
 
-class AstParenRenderer : ExpressionReader
+class AstParenRenderer
 {
     private let ast: Expression
 
@@ -11,10 +11,10 @@ class AstParenRenderer : ExpressionReader
 
     func renderAst() -> String
     {
-        return self.read(self.ast)
+        return self.render(self.ast)
     }
 
-    func read(_ expression: Expression) -> String
+    private func render(_ expression: Expression) -> String
     {
         switch expression {
             case let .literal(value):
@@ -31,7 +31,7 @@ class AstParenRenderer : ExpressionReader
     private func parenthesize(_ name: String, _ exprs: Expression...) -> String
     {
         let description = exprs.reduce(into: "\(name)") {
-            (string, next) in string += " \(self.read(next))"
+            (string, next) in string += " \(self.render(next))"
         }
         return "(" + description + ")"
     }

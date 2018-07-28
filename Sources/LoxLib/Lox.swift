@@ -68,14 +68,14 @@ public class Lox
 
         let parser = Parser(tokens: tokens)
         guard
-            let expr = parser.parse(),
+            let program = parser.parse(),
             !self.hasError else
         {
             print("Parsing failed")
             return
         }
 
-        self.interpreter.interpret(expr)
+        self.interpreter.interpret(program)
     }
 
     private static func printPrompt()
