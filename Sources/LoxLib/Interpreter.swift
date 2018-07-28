@@ -4,7 +4,8 @@ class Interpreter
 {
     func interpret(_ tree: Expression) {
         do {
-            try print(self.evaluate(tree) ?? "nil")
+            let value = try self.evaluate(tree)
+            print(self.stringify(value))
         }
         catch let error as RuntimeError {
             self.reportRuntimeError(error)
@@ -70,12 +71,6 @@ class Interpreter
         } else {
             return true
         }
-    }
-
-    private enum NumericOperator
-    {
-        case combine((Double, Double) -> Double)
-        case compare((Double, Double) -> Bool)
     }
 
     private func interpretBinary(leftExpr: Expression, op: Token, rightExpr: Expression) throws -> Any?
@@ -150,6 +145,23 @@ class Interpreter
         }
     }
 
+    private func stringify(_ value: Any?) -> String
+    {
+        guard let value = value else {
+            return "nil"
+        }
+
+        if let doubleValue = value as? Double {
+            if doubleValue.isIntegral {
+                return String(Int(doubleValue))
+            } else {
+                return String(doubleValue)
+            }
+        }
+
+        return String(describing: value)
+    }
+
     //MARK:- Error
 
     private func reportRuntimeError(_ error: RuntimeError)
@@ -174,4 +186,9 @@ private extension RuntimeError
     {
         return RuntimeError(token: token, message: "Operand must be a number")
     }
+}
+
+private extension Double
+{
+    var isIntegral: Bool { return 0 == self.truncatingRemainder(dividingBy: 1) }
 }
