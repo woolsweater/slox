@@ -102,7 +102,7 @@ class Parser
 
     private func addition() throws -> Expression
     {
-        if self.matchAny(.minus, .plus) {
+        if self.matchAny(.plus) {
             _ = self.reportParseError(message: "missing lefthand expression")
             return try self.addition()
         }
@@ -156,7 +156,6 @@ class Parser
             let expr = try self.expression()
             try self.mustConsume(.rightParen,
                                  message: "Expected ')' to match earlier '('")
-            self.matchBadToken(.rightParen)
             return .grouping(expr)
         }
 
@@ -183,15 +182,6 @@ class Parser
         return self.peek().kind == kind
     }
 
-    /** Check for an error production; consume and report it if found */
-    private func matchBadToken(_ kind: Token.Kind)
-    {
-        guard !(self.isAtEnd) else { return }
-        if self.matchAny(kind) {
-            _ = self.reportParseError(message: "Misplaced \(kind) token")
-        }
-    }
-
     private func peek() -> Token
     {
         return self.tokens[self.index]
@@ -204,6 +194,7 @@ class Parser
 
     //MARK:- Error handling
 
+    /** Consume the next token if it matches `kind` or else report an error. */
     private func mustConsume(_ kind: Token.Kind, message: String) throws
     {
         guard self.check(kind) else {

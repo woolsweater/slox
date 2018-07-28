@@ -1,27 +1,31 @@
 import Foundation
 
-class Interpreter : ExpressionReader
+class Interpreter
 {
-    func interpret(_ expression: Expression) {
-        guard let value = self.read(expression) else {
-            print("Unable to interpret")
-            return
+    func interpret(_ tree: Expression) {
+        do {
+            try print(self.evaluate(tree) ?? "nil")
         }
-
-        print(value)
+        catch let error as RuntimeError {
+            self.reportRuntimeError(error)
+        } catch {
+            fatalError("Unknown interpretation failure")
+        }
     }
 
-    func read(_ expression: Expression) -> Any?
+    private func evaluate(_ expression: Expression) throws -> Any?
     {
         switch expression {
             case let .literal(value):
                 return self.interpretLiteral(value)
             case let .unary(op: opToken, operand):
-                return self.interpretUnary(op: opToken, operand)
+                return try self.interpretUnary(op: opToken, operand)
             case let .binary(left: left, op: opToken, right: right):
-                return self.interpretBinary(leftExpr: left, op: opToken, rightExpr: right)
+                return try self.interpretBinary(leftExpr: left,
+                                                      op: opToken,
+                                               rightExpr: right)
             case let .grouping(groupedExpression):
-                return self.read(groupedExpression)
+                return try self.evaluate(groupedExpression)
         }
     }
 
@@ -35,24 +39,25 @@ class Interpreter : ExpressionReader
         }
     }
 
-    private func interpretUnary(op: Token, _ expression: Expression) -> Any?
+    private func interpretUnary(op: Token, _ expression: Expression) throws -> Any?
     {
-        let operandValue = self.read(expression)
+        let operandValue = try self.evaluate(expression)
 
         switch op.kind {
             case .minus:
-                return -self.doubleValue(of: operandValue)
+                guard let doubleValue = operandValue as? Double else {
+                    throw RuntimeError.numeric(at: op)
+                }
+                return -doubleValue
             case .bang:
                 return !self.truthValue(of: operandValue)
             default:
-                //TODO: Handle bad operator
-                return nil
+                fatalError("Found invalid unary operator \(op.kind)")
         }
     }
 
     private func doubleValue(of value: Any?) -> Double
     {
-        //TODO: Handle error
         return value as! Double
     }
 
@@ -67,58 +72,66 @@ class Interpreter : ExpressionReader
         }
     }
 
-    private func interpretBinary(leftExpr: Expression, op: Token, rightExpr: Expression) -> Any?
+    private enum NumericOperator
     {
-        let leftValue = self.read(leftExpr)
-        let rightValue = self.read(rightExpr)
+        case combine((Double, Double) -> Double)
+        case compare((Double, Double) -> Bool)
+    }
+
+    private func interpretBinary(leftExpr: Expression, op: Token, rightExpr: Expression) throws -> Any?
+    {
+        let leftValue = try self.evaluate(leftExpr)
+        let rightValue = try self.evaluate(rightExpr)
 
         switch op.kind {
-            case .minus:
-                return self.performArithmetic(using: (-), leftValue, rightValue)
-            case .slash:
-                return self.performArithmetic(using: (/), leftValue, rightValue)
+            case .minus: fallthrough
+            case .slash: fallthrough
             case .star:
-                return self.performArithmetic(using: (*), leftValue, rightValue)
+                return try self.performArithmetic(for: op, leftValue, rightValue)
             case .plus:
                 if leftValue is Double && rightValue is Double {
-                    return self.performArithmetic(using: (+), leftValue, rightValue)
+                    return try! self.performArithmetic(for: op, leftValue, rightValue)
                 }
                 else if let leftString = leftValue as? String, let rightString = rightValue as? String {
                     return leftString + rightString
                 }
                 else {
-                    //TODO: Handle bad operands
-                    return nil
+                    throw RuntimeError(token: op,
+                                     message: "Operands must be string or number with matching types")
                 }
-            case .greater:
-                return self.compareNumbers(using: (>), leftValue, rightValue)
-            case .greaterEqual:
-                return self.compareNumbers(using: (>=), leftValue, rightValue)
-            case .less:
-                return self.compareNumbers(using: (<), leftValue, rightValue)
+            case .greater: fallthrough
+            case .greaterEqual: fallthrough
+            case .less: fallthrough
             case .lessEqual:
-                return self.compareNumbers(using: (<=), leftValue, rightValue)
+                return try self.compareNumbers(using: op, leftValue, rightValue)
             case .equalEqual:
-                return self.areEqual(leftValue, rightValue)
+                return self.evaluateEquality(leftValue, rightValue)
             case .bangEqual:
-                return !(self.areEqual(leftValue, rightValue))
+                return !(self.evaluateEquality(leftValue, rightValue))
             default:
-                //TODO: Handle bad operator
-                return nil
+                fatalError("Found invalid binary operator \(op.kind)")
         }
     }
 
-    private func performArithmetic(using op: (Double, Double) -> Double, _ left: Any?, _ right: Any?) -> Double
+    private func performArithmetic(for token: Token, _ left: Any?, _ right: Any?) throws -> Double
     {
-        return op(self.doubleValue(of: left), self.doubleValue(of: right))
+        let operation = token.kind.arithmeticOperation!
+        guard let leftDouble = left as? Double, let rightDouble = right as? Double else {
+            throw RuntimeError.numeric(at: token)
+        }
+        return operation(leftDouble, rightDouble)
     }
 
-    private func compareNumbers(using op: (Double, Double) -> Bool, _ left: Any?, _ right: Any?) -> Bool
+    private func compareNumbers(using token: Token, _ left: Any?, _ right: Any?) throws -> Bool
     {
-        return op(self.doubleValue(of: left), self.doubleValue(of: right))
+        let operation = token.kind.comparisonOperation!
+        guard let leftDouble = left as? Double, let rightDouble = right as? Double else {
+            throw RuntimeError.numeric(at: token)
+        }
+        return operation(leftDouble, rightDouble)
     }
 
-    private func areEqual(_ left: Any?, _ right: Any?) -> Bool
+    private func evaluateEquality(_ left: Any?, _ right: Any?) -> Bool
     {
         if let leftDouble = left as? Double, let rightDouble = right as? Double {
             return leftDouble == rightDouble
@@ -135,5 +148,30 @@ class Interpreter : ExpressionReader
         else {
             return false
         }
+    }
+
+    //MARK:- Error
+
+    private func reportRuntimeError(_ error: RuntimeError)
+    {
+        let token = error.token
+        let locationDescription = token.kind == .EOF ? "end" : "'\(token.lexeme)'"
+        Lox.report(at: token.line,
+             location: "at \(locationDescription)",
+              message: error.message)
+    }
+}
+
+private struct RuntimeError : Error
+{
+    let token: Token
+    let message: String
+}
+
+private extension RuntimeError
+{
+    static func numeric(at token: Token) -> RuntimeError
+    {
+        return RuntimeError(token: token, message: "Operand must be a number")
     }
 }
