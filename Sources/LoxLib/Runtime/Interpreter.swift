@@ -128,6 +128,8 @@ class Interpreter
                 return self.evaluateEquality(leftValue, rightValue)
             case .bangEqual:
                 return !(self.evaluateEquality(leftValue, rightValue))
+            case .comma:
+                return rightValue
             default:
                 fatalError("Found invalid binary operator \(op.kind)")
         }
