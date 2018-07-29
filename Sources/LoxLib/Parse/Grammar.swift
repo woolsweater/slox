@@ -11,7 +11,7 @@ indirect enum Expression : Equatable
      An expression referring to a variable, that evaluates to the variable's
      stored value.
      */
-    case variable(name: Token)
+    case variable(Token)
     /** An expression of a unary operator applied to another expresssion. */
     case unary(op: Token, Expression)
     /** An expression with two subexpressions composed with an operator. */
@@ -20,6 +20,7 @@ indirect enum Expression : Equatable
     case assignment(name: Token, value: Expression)
 }
 
+/** An element of Lox grammar that produces an effect. */
 enum Statement : Equatable
 {
     /** A statement declaring a variable. An initial value may be provided. */
@@ -28,4 +29,6 @@ enum Statement : Equatable
     case expression(Expression)
     /** A statement for displaying an expression as output to the user. */
     case print(Expression)
+    /** A brace-enclosed series of other statements. */
+    indirect case block([Statement])
 }

@@ -2,7 +2,11 @@ import Foundation
 
 class Interpreter
 {
-    private let environment = Environment()
+    /**
+     Variable/value pairs in the current scope. Changes as blocks are entered
+     and exited.
+     */
+    private var environment = Environment()
 
     func interpret(_ program: [Statement]) {
         do {
@@ -28,6 +32,8 @@ class Interpreter
                 _ = try self.evaluate(expression)
             case let .variableDecl(name: name, initializer: expression):
                 try self.evaluateVariableDecl(name: name, initializer: expression)
+            case let .block(statements):
+                try self.executeBlock(statements)
         }
     }
 
@@ -38,7 +44,7 @@ class Interpreter
                 return self.interpretLiteral(value)
             case let .grouping(groupedExpression):
                 return try self.evaluate(groupedExpression)
-            case let .variable(name: name):
+            case let .variable(name):
                 return try self.environment.read(variable: name)
             case let .unary(op: opToken, operand):
                 return try self.interpretUnary(op: opToken, operand)
@@ -77,6 +83,18 @@ class Interpreter
         try self.environment.assign(variable: name, value: evaluated)
 
         return evaluated
+    }
+
+    //MARK:- Blocks
+
+    private func executeBlock(_ statements: [Statement]) throws
+    {
+        self.environment = Environment(nestedIn: self.environment)
+        defer { self.environment = self.environment.enclosing! }
+
+        for statement in statements {
+            try self.execute(statement)
+        }
     }
 
     //MARK:- Unary

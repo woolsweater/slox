@@ -72,6 +72,10 @@ class Parser
             return try self.finishPrintStatement()
         }
 
+        if self.matchAny(.leftBrace) {
+            return try .block(self.finishBlock())
+        }
+
         return try self.finishExpressionStatement()
     }
 
@@ -81,6 +85,21 @@ class Parser
         try self.mustConsume(.semicolon,
                              message: "Expected ';' to terminate print statement.")
         return .print(expression)
+    }
+
+    private func finishBlock() throws -> [Statement]
+    {
+        var statements: [Statement] = []
+
+        while !(self.check(.rightBrace)) && !(self.isAtEnd) {
+            guard let declaration = self.declaration() else {
+                continue
+            }
+            statements.append(declaration)
+        }
+
+        try self.mustConsume(.rightBrace, message: "Expected '}' to terminate block.")
+        return statements
     }
 
     private func finishExpressionStatement() throws -> Statement
@@ -229,7 +248,7 @@ class Parser
         }
 
         if self.matchAny(.identifier) {
-            return .variable(name: self.previous)
+            return .variable(self.previous)
         }
 
         if self.matchAny(.leftParen) {
@@ -294,6 +313,11 @@ class Parser
         return ParseError()
     }
 
+    /**
+     Step forward through a statement that has failed to parse, resuming when
+     the parsing is likely to begin at a new statement, so that we can
+     continue to report as many errors as possible.
+     */
     private func synchronize()
     {
         while !self.isAtEnd {
