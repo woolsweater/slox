@@ -36,24 +36,22 @@ class Interpreter
         switch expression {
             case let .literal(value):
                 return self.interpretLiteral(value)
+            case let .grouping(groupedExpression):
+                return try self.evaluate(groupedExpression)
+            case let .variable(name: name):
+                return try self.environment.read(variable: name)
             case let .unary(op: opToken, operand):
                 return try self.interpretUnary(op: opToken, operand)
             case let .binary(left: left, op: opToken, right: right):
                 return try self.interpretBinary(leftExpr: left,
                                                       op: opToken,
                                                rightExpr: right)
-            case let .grouping(groupedExpression):
-                return try self.evaluate(groupedExpression)
-            case let .variable(name: name):
-                return try self.environment.read(variable: name)
+            case let .assignment(name: name, value: value):
+                return try self.evaluateAssignment(name: name, value: value)
         }
     }
 
-    private func evaluateVariableDecl(name: Token, initializer: Expression?) throws
-    {
-        let value = try initializer.flatMap(self.evaluate)
-        self.environment.define(name: name.lexeme, value: value)
-    }
+    //MARK:- Literal
 
     private func interpretLiteral(_ value: LiteralValue) -> Any?
     {
@@ -64,6 +62,24 @@ class Interpreter
             case .nil: return nil
         }
     }
+
+    //MARK:- Variables
+
+    private func evaluateVariableDecl(name: Token, initializer: Expression?) throws
+    {
+        let value = try initializer.flatMap(self.evaluate)
+        self.environment.define(name: name.lexeme, value: value)
+    }
+
+    private func evaluateAssignment(name: Token, value: Expression) throws -> Any?
+    {
+        let evaluated = try self.evaluate(value)
+        try self.environment.assign(variable: name, value: evaluated)
+
+        return evaluated
+    }
+
+    //MARK:- Unary
 
     private func interpretUnary(op: Token, _ expression: Expression) throws -> Any?
     {
@@ -79,22 +95,6 @@ class Interpreter
                 return !self.truthValue(of: operandValue)
             default:
                 fatalError("Found invalid unary operator \(op.kind)")
-        }
-    }
-
-    private func doubleValue(of value: Any?) -> Double
-    {
-        return value as! Double
-    }
-
-    private func truthValue(of value: Any?) -> Bool
-    {
-        if let boolValue = value as? Bool {
-            return boolValue
-        } else if value == nil {
-            return false
-        } else {
-            return true
         }
     }
 
@@ -130,6 +130,24 @@ class Interpreter
                 return !(self.evaluateEquality(leftValue, rightValue))
             default:
                 fatalError("Found invalid binary operator \(op.kind)")
+        }
+    }
+
+    //MARK:- Helper
+
+    private func doubleValue(of value: Any?) -> Double
+    {
+        return value as! Double
+    }
+
+    private func truthValue(of value: Any?) -> Bool
+    {
+        if let boolValue = value as? Bool {
+            return boolValue
+        } else if value == nil {
+            return false
+        } else {
+            return true
         }
     }
 
@@ -187,7 +205,7 @@ class Interpreter
         return String(describing: value)
     }
 
-    //MARK:- Error
+    //MARK:- Error handling
 
     private func reportRuntimeError(_ error: RuntimeError)
     {

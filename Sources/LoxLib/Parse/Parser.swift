@@ -99,25 +99,51 @@ class Parser
     private func joined() throws -> Expression
     {
         if self.matchAny(.comma) {
-            _ = self.reportParseError(message: "missing lefthand expression")
+            _ = self.reportParseError(message: "Missing lefthand expression")
             return try self.joined()
         }
 
-        var expr = try self.equality()
+        var expr = try self.assignment()
 
         while self.matchAny(.comma) {
             let op = self.previous
-            let right = try self.equality()
+            let right = try self.assignment()
             expr = .binary(left: expr, op: op, right: right)
         }
 
         return expr
     }
 
+    private func assignment() throws -> Expression
+    {
+        if self.matchAny(.equal) {
+            _ = self.reportParseError(message: "Missing lefthand expression")
+            return try self.assignment()
+        }
+
+        // We do not want to use lookahead here to validate the assignment
+        // right off the bat. Instead, we parse the left-hand side first.
+        let lvalue = try self.equality()
+
+        guard self.matchAny(.equal) else {
+            return lvalue
+        }
+
+        // Then look*behind* to make sure we have a valid assignment target
+        guard case let .variable(name: name) = lvalue else {
+            _ = self.reportParseError(message: "Invalid lvalue in assignment")
+            return lvalue
+        }
+
+        let rvalue = try self.assignment()
+
+        return .assignment(name: name, value: rvalue)
+    }
+
     private func equality() throws -> Expression
     {
         if self.matchAny(.bangEqual, .equalEqual) {
-            _ = self.reportParseError(message: "missing lefthand expression")
+            _ = self.reportParseError(message: "Missing lefthand expression")
             return try self.equality()
         }
 
@@ -135,7 +161,7 @@ class Parser
     private func comparison() throws -> Expression
     {
         if self.matchAny(.greater, .greaterEqual, .less, .lessEqual) {
-            _ = self.reportParseError(message: "missing lefthand expression")
+            _ = self.reportParseError(message: "Missing lefthand expression")
             return try self.comparison()
         }
 
@@ -153,7 +179,7 @@ class Parser
     private func addition() throws -> Expression
     {
         if self.matchAny(.plus) {
-            _ = self.reportParseError(message: "missing lefthand expression")
+            _ = self.reportParseError(message: "Missing lefthand expression")
             return try self.addition()
         }
 
@@ -270,8 +296,6 @@ class Parser
 
     private func synchronize()
     {
-        self.advanceIndex()
-
         while !self.isAtEnd {
             // Moved past problematic statement
             if self.previous.kind == .semicolon { return }

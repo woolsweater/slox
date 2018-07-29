@@ -11,9 +11,13 @@ exprStmt       → expression ";" ;
 printStmt      → "print" expression ";" ;
 
 expression     → joined ;
-joined         → equality ( "," equality )
+joined         → assignment ( "," assignment )
                | join-error ;
 join-error     → "," joined ;
+assignment     → IDENTIFIER "=" assignment
+               | assign-error
+               | equality ;
+assign-error   → "=" equality ;
 equality       → comparison ( ( "!=" | "==" ) comparison )*
                | equal-error ;
 equal-error    → ( "!=" | "==" ) equality ;

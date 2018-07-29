@@ -1,0 +1,5 @@
+var a = 10;
+var b = a;
+a = 12;
+print a;
+print b;
