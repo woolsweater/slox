@@ -5,6 +5,13 @@ class Environment
 {
     private var values : [String : Any?] = [:]
 
+    private let enclosing : Environment?
+
+    init(enclosing: Environment? = nil)
+    {
+        self.enclosing = enclosing
+    }
+
     func define(name: String, value: Any?)
     {
         // Redefinition of variables is permitted
@@ -13,7 +20,7 @@ class Environment
 
     func read(variable: Token) throws -> Any?
     {
-        guard let value = self.values[variable.lexeme] else {
+        guard let value = self.readAllScopes(toFind: variable) else {
             throw RuntimeError.undefined(variable)
         }
 
@@ -24,10 +31,20 @@ class Environment
     {
         let name = variable.lexeme
         guard self.values.keys.contains(name) else {
-            throw RuntimeError.undefined(variable)
+            guard let enclosing = self.enclosing else {
+                throw RuntimeError.undefined(variable)
+            }
+            try enclosing.assign(variable: variable, value: value)
+            return
         }
 
         self.values[name] = value
+    }
+
+    private func readAllScopes(toFind variable: Token) -> Any?
+    {
+        return self.values[variable.lexeme] ??
+                self.enclosing?.readAllScopes(toFind: variable)
     }
 }
 
