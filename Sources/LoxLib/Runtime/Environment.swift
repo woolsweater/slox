@@ -36,13 +36,14 @@ class Environment
 
     /**
      Look up the value of the given variable, starting in the current
-     scope and then looking in outer scopes in order.
+     scope and then looking in enclosing scopes, in order.
      - throws: A `RuntimeError` if the variable is not visible in any
      reachable scope.
+     - returns: The innermost value of the variable.
      */
     func read(variable: Token) throws -> Any?
     {
-        guard let value = self.readAllScopes(toFind: variable) else {
+        guard let value = self.lookUpValue(of: variable) else {
             throw RuntimeError.undefined(variable)
         }
 
@@ -58,21 +59,66 @@ class Environment
     func assign(variable: Token, value: Any?) throws
     {
         let name = variable.lexeme
+        guard self.setValue(value, forName: name) else {
+            throw RuntimeError.undefined(variable)
+        }
+    }
+
+    //MARK:- REPL support
+
+    /**
+     Define a special variable named '_' that the interpreter will use to store
+     the result of the last evaluated expression.
+     - remark: This should only be used when the interpreter is running in a
+     REPL context. Note that we do not try to prevent the user from overwriting
+     or shadowing the variable, since it can also be used in scripts.
+     */
+    func createCut()
+    {
+        self.define(name: ReplSupport.cut, value: nil)
+    }
+
+    /**
+     Set the value of the special '_' variable to the given new value.
+     - remark: It is an error to try to update the value without having called
+     `createCut()` first.
+     */
+    func updateCut(value: Any?) throws
+    {
+        guard self.setValue(value, forName: ReplSupport.cut) else {
+            throw RuntimeError.missingCut
+        }
+    }
+
+    //MARK:- Internal
+
+    /**
+     Look up the variable represented by the given token in this scope and
+     any enclosing scopes.
+     - returns: The variable's value if lookup succeeds, else `nil`.
+     */
+    private func lookUpValue(of variable: Token) -> Any??
+    {
+        return self.values[variable.lexeme] ??
+                self.enclosing?.lookUpValue(of: variable)
+    }
+
+    /**
+     Look up the named variable in this scope and any enclosing scopes. If
+     found, update its value.
+     - returns: `true` if the update succeeds, else `false`
+     */
+    private func setValue(_ value: Any?, forName name: String) -> Bool
+    {
         guard self.values.keys.contains(name) else {
             guard let enclosing = self.enclosing else {
-                throw RuntimeError.undefined(variable)
+                return false
             }
-            try enclosing.assign(variable: variable, value: value)
-            return
+            return enclosing.setValue(value, forName: name)
         }
 
         self.values[name] = value
-    }
-
-    private func readAllScopes(toFind variable: Token) -> Any?
-    {
-        return self.values[variable.lexeme] ??
-                self.enclosing?.readAllScopes(toFind: variable)
+        return true
     }
 }
 
@@ -83,4 +129,18 @@ private extension RuntimeError
         return RuntimeError(token: variable,
                           message: "Name '\(variable.lexeme)' is not defined")
     }
+
+    static let missingCut = RuntimeError(
+        token: Token(kind: .identifier, lexeme: ReplSupport.cut, literal: nil, line: 1),
+        message: "'_' does not exist outside of REPL context"
+    )
+}
+
+private struct ReplSupport
+{
+    /**
+     Name of the special variable in a REPL context that holds the last result of
+     an expression evaluation.
+     */
+    static let cut = "_"
 }

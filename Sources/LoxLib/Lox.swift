@@ -4,7 +4,7 @@ public class Lox
 {
     private(set) static var hasError = false
 
-    private static let interpreter = Interpreter()
+    private static var interpreter: Interpreter!
 
     public static func main(_ args: [String]) -> Int32
     {
@@ -15,11 +15,13 @@ public class Lox
         }
 
         if let path = args.first {
+            self.interpreter = Interpreter(replMode: false)
             do { try self.runFile(path) }
             catch LoxError.interpretation { return ExitCode.interpreterFailure.returnValue }
             catch { return ExitCode.badInput.returnValue }
         }
         else {
+            self.interpreter = Interpreter(replMode: true)
             self.runPrompt()
         }
 

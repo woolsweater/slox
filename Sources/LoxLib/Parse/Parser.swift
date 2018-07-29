@@ -140,15 +140,16 @@ class Parser
             return try self.assignment()
         }
 
-        // We do not want to use lookahead here to validate the assignment
-        // right off the bat. Instead, we parse the left-hand side first.
+        // We do not want to use arbitrary-length lookahead here to validate
+        // the assignment right off the bat. Instead, we parse the left-hand
+        // side first...
         let lvalue = try self.equality()
 
         guard self.matchAny(.equal) else {
             return lvalue
         }
 
-        // Then look*behind* to make sure we have a valid assignment target
+        // then look*behind* to make sure we have a valid assignment target
         guard case let .variable(name: name) = lvalue else {
             _ = self.reportParseError(message: "Invalid lvalue in assignment")
             return lvalue

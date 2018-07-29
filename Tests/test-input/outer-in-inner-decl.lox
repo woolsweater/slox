@@ -1,0 +1,8 @@
+var a = 1;
+{
+    var a = a + 2;
+    print a;    // output: 3
+    a = a + 3;
+    print a;    // output: 6
+}
+print a;    // output: 1

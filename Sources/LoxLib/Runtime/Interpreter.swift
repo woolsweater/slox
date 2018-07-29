@@ -8,6 +8,21 @@ class Interpreter
      */
     private var environment = Environment()
 
+    /**
+     Whether the interpreter is running in a REPL instead of interpreting a
+     file. In the REPL case, the evaluated result of each expression statement
+     will be printed and also stored in a special "cut" variable.
+     */
+    private let isRepl: Bool
+
+    init(replMode: Bool)
+    {
+        self.isRepl = replMode
+        if self.isRepl {
+            self.environment.createCut()
+        }
+    }
+
     func interpret(_ program: [Statement]) {
         do {
             for statement in program {
@@ -29,7 +44,11 @@ class Interpreter
                 let value = try self.evaluate(expression)
                 print(self.stringify(value))
             case let .expression(expression):
-                _ = try self.evaluate(expression)
+                let value = try self.evaluate(expression)
+                if self.isRepl {
+                    print(self.stringify(value))
+                    try self.environment.updateCut(value: value)
+                }
             case let .variableDecl(name: name, initializer: expression):
                 try self.evaluateVariableDecl(name: name, initializer: expression)
             case let .block(statements):
