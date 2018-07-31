@@ -16,7 +16,7 @@ class Environment
     let enclosing : Environment?
 
     /** The collection of variables and values defined in this scope. */
-    private var values : [String : Any?] = [:]
+    private var values : [String : LoxValue?] = [:]
 
     /** Create an environment nested inside the given one. */
     init(nestedIn: Environment? = nil)
@@ -26,10 +26,13 @@ class Environment
 
     /**
      Add a variable to the environment, with the given value.
+     - parameter name: The identifier for the variable.
+     - parameter value: The initial value of the variable; pass `nil` if
+     there was no initializer expression.
      - remark: This is also permitted to assign a new value to an
      existing varaible.
      */
-    func define(name: String, value: Any?)
+    func define(name: String, value: LoxValue?)
     {
         self.values[name] = value
     }
@@ -38,13 +41,17 @@ class Environment
      Look up the value of the given variable, starting in the current
      scope and then looking in enclosing scopes, in order.
      - throws: A `RuntimeError` if the variable is not visible in any
-     reachable scope.
+     reachable scope, or if it was declared but never assigned a value.
      - returns: The innermost value of the variable.
      */
-    func read(variable: Token) throws -> Any?
+    func read(variable: Token) throws -> LoxValue
     {
-        guard let value = self.lookUpValue(of: variable) else {
+        guard let lookup = self.lookUpValue(of: variable) else {
             throw RuntimeError.undefined(variable)
+        }
+
+        guard let value = lookup else {
+            throw RuntimeError.uninitialized(variable)
         }
 
         return value
@@ -56,7 +63,7 @@ class Environment
      - throws: A `RuntimeError` if the variable is not visible in any
      reachable scope.
      */
-    func assign(variable: Token, value: Any?) throws
+    func assign(variable: Token, value: LoxValue) throws
     {
         let name = variable.lexeme
         guard self.setValue(value, forName: name) else {
@@ -83,7 +90,7 @@ class Environment
      - remark: It is an error to try to update the value without having called
      `createCut()` first.
      */
-    func updateCut(value: Any?) throws
+    func updateCut(value: LoxValue) throws
     {
         guard self.setValue(value, forName: ReplSupport.cut) else {
             throw RuntimeError.missingCut
@@ -97,7 +104,7 @@ class Environment
      any enclosing scopes.
      - returns: The variable's value if lookup succeeds, else `nil`.
      */
-    private func lookUpValue(of variable: Token) -> Any??
+    private func lookUpValue(of variable: Token) -> LoxValue??
     {
         return self.values[variable.lexeme] ??
                 self.enclosing?.lookUpValue(of: variable)
@@ -108,7 +115,7 @@ class Environment
      found, update its value.
      - returns: `true` if the update succeeds, else `false`
      */
-    private func setValue(_ value: Any?, forName name: String) -> Bool
+    private func setValue(_ value: LoxValue, forName name: String) -> Bool
     {
         guard self.values.keys.contains(name) else {
             guard let enclosing = self.enclosing else {
@@ -130,9 +137,15 @@ private extension RuntimeError
                           message: "Name '\(variable.lexeme)' is not defined")
     }
 
+    static func uninitialized(_ variable: Token) -> RuntimeError
+    {
+        return RuntimeError(token: variable,
+                          message: "Variable '\(variable.lexeme)' used before being initialized")
+    }
+
     static let missingCut = RuntimeError(
         token: Token(kind: .identifier, lexeme: ReplSupport.cut, literal: nil, line: 1),
-        message: "'_' does not exist outside of REPL context"
+        message: "'_' does not exist in the current context"
     )
 }
 

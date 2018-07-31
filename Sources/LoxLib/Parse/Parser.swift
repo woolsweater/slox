@@ -55,13 +55,15 @@ class Parser
 
     private func variableDecl() throws -> Statement
     {
-        try self.mustConsume(.identifier, message: "Expected an identifier in variable declaration.")
+        try self.mustConsume(.identifier,
+                             message: "Expected an identifier in variable declaration.")
 
         let name = self.previous
 
         let initializer = self.matchAny(.equal) ? try self.expression() : nil
 
-        try self.mustConsume(.semicolon, message: "Expected ';' after variable declaration.")
+        try self.mustConsume(.semicolon,
+                             message: "Expected ';' after variable declaration.")
 
         return .variableDecl(name: name, initializer: initializer)
     }

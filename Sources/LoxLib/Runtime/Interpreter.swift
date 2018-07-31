@@ -56,11 +56,11 @@ class Interpreter
         }
     }
 
-    private func evaluate(_ expression: Expression) throws -> Any?
+    private func evaluate(_ expression: Expression) throws -> LoxValue
     {
         switch expression {
-            case let .literal(value):
-                return self.interpretLiteral(value)
+            case let .literal(literal):
+                return literal.loxValue
             case let .grouping(groupedExpression):
                 return try self.evaluate(groupedExpression)
             case let .variable(name):
@@ -76,18 +76,6 @@ class Interpreter
         }
     }
 
-    //MARK:- Literal
-
-    private func interpretLiteral(_ value: LiteralValue) -> Any?
-    {
-        switch value {
-            case let .double(double): return double
-            case let .string(string): return string
-            case let .bool(bool): return bool
-            case .nil: return nil
-        }
-    }
-
     //MARK:- Variables
 
     private func evaluateVariableDecl(name: Token, initializer: Expression?) throws
@@ -96,7 +84,7 @@ class Interpreter
         self.environment.define(name: name.lexeme, value: value)
     }
 
-    private func evaluateAssignment(name: Token, value: Expression) throws -> Any?
+    private func evaluateAssignment(name: Token, value: Expression) throws -> LoxValue
     {
         let evaluated = try self.evaluate(value)
         try self.environment.assign(variable: name, value: evaluated)
@@ -118,24 +106,24 @@ class Interpreter
 
     //MARK:- Unary
 
-    private func interpretUnary(op: Token, _ expression: Expression) throws -> Any?
+    private func interpretUnary(op: Token, _ expression: Expression) throws -> LoxValue
     {
         let operandValue = try self.evaluate(expression)
 
         switch op.kind {
             case .minus:
-                guard let doubleValue = operandValue as? Double else {
+                guard case let .double(doubleValue) = operandValue else {
                     throw RuntimeError.numeric(at: op)
                 }
-                return -doubleValue
+                return .double(-doubleValue)
             case .bang:
-                return !self.truthValue(of: operandValue)
+                return .bool(!self.truthValue(of: operandValue))
             default:
                 fatalError("Found invalid unary operator \(op.kind)")
         }
     }
 
-    private func interpretBinary(leftExpr: Expression, op: Token, rightExpr: Expression) throws -> Any?
+    private func interpretBinary(leftExpr: Expression, op: Token, rightExpr: Expression) throws -> LoxValue
     {
         let leftValue = try self.evaluate(leftExpr)
         let rightValue = try self.evaluate(rightExpr)
@@ -144,13 +132,18 @@ class Interpreter
             case .minus: fallthrough
             case .slash: fallthrough
             case .star:
-                return try self.performArithmetic(for: op, leftValue, rightValue)
-            case .plus:
-                if leftValue is Double && rightValue is Double {
-                    return try! self.performArithmetic(for: op, leftValue, rightValue)
+                guard case let .double(lhs) = leftValue, case let .double(rhs) = rightValue else {
+                    throw RuntimeError.numeric(at: op)
                 }
-                else if let leftString = leftValue as? String, let rightString = rightValue as? String {
-                    return leftString + rightString
+                let arithmeticOperation = op.arithmeticOperation!
+                return .double(arithmeticOperation(lhs, rhs))
+            case .plus:
+                if case let .double(lhs) = leftValue, case let .double(rhs) = rightValue {
+                    let arithmeticOperation = op.arithmeticOperation!
+                    return .double(arithmeticOperation(lhs, rhs))
+                }
+                else if case let .string(lhs) = leftValue, case let .string(rhs) = rightValue {
+                    return .string(lhs + rhs)
                 }
                 else {
                     throw RuntimeError(token: op,
@@ -160,11 +153,15 @@ class Interpreter
             case .greaterEqual: fallthrough
             case .less: fallthrough
             case .lessEqual:
-                return try self.compareNumbers(using: op, leftValue, rightValue)
+                guard case let .double(lhs) = leftValue, case let .double(rhs) = rightValue else {
+                    throw RuntimeError.numeric(at: op)
+                }
+                let comparisonOperation = op.comparisonOperation!
+                return .bool(comparisonOperation(lhs, rhs))
             case .equalEqual:
-                return self.evaluateEquality(leftValue, rightValue)
+                return .bool(leftValue == rightValue)
             case .bangEqual:
-                return !(self.evaluateEquality(leftValue, rightValue))
+                return .bool(leftValue != rightValue)
             case .comma:
                 return rightValue
             default:
@@ -174,74 +171,38 @@ class Interpreter
 
     //MARK:- Helper
 
-    private func doubleValue(of value: Any?) -> Double
+    private func truthValue(of value: LoxValue) -> Bool
     {
-        return value as! Double
+        switch value {
+            case let .bool(boolValue):
+                return boolValue
+            case .nil:
+                return false
+            default:
+                return true
+        }
     }
 
-    private func truthValue(of value: Any?) -> Bool
+    private func stringify(_ value: LoxValue) -> String
     {
-        if let boolValue = value as? Bool {
-            return boolValue
-        } else if value == nil {
-            return false
+        switch value {
+            case let .double(double):
+                return self.formatNumber(double)
+            case let .string(string):
+                return string
+            case let .bool(bool):
+                return String(describing: bool)
+            case .nil:
+                return "nil"
+        }
+    }
+
+    private func formatNumber(_ number: Double) -> String {
+        if number.isIntegral {
+            return String(Int(number))
         } else {
-            return true
+            return String(number)
         }
-    }
-
-    private func performArithmetic(for token: Token, _ left: Any?, _ right: Any?) throws -> Double
-    {
-        let operation = token.kind.arithmeticOperation!
-        guard let leftDouble = left as? Double, let rightDouble = right as? Double else {
-            throw RuntimeError.numeric(at: token)
-        }
-        return operation(leftDouble, rightDouble)
-    }
-
-    private func compareNumbers(using token: Token, _ left: Any?, _ right: Any?) throws -> Bool
-    {
-        let operation = token.kind.comparisonOperation!
-        guard let leftDouble = left as? Double, let rightDouble = right as? Double else {
-            throw RuntimeError.numeric(at: token)
-        }
-        return operation(leftDouble, rightDouble)
-    }
-
-    private func evaluateEquality(_ left: Any?, _ right: Any?) -> Bool
-    {
-        if let leftDouble = left as? Double, let rightDouble = right as? Double {
-            return leftDouble == rightDouble
-        }
-        else if let leftString = left as? String, let rightString = right as? String {
-            return leftString == rightString
-        }
-        else if let leftBool = left as? Bool, let rightBool = right as? Bool {
-            return leftBool == rightBool
-        }
-        else if left == nil && right == nil {
-            return true
-        }
-        else {
-            return false
-        }
-    }
-
-    private func stringify(_ value: Any?) -> String
-    {
-        guard let value = value else {
-            return "nil"
-        }
-
-        if let doubleValue = value as? Double {
-            if doubleValue.isIntegral {
-                return String(Int(doubleValue))
-            } else {
-                return String(doubleValue)
-            }
-        }
-
-        return String(describing: value)
     }
 
     //MARK:- Error handling
