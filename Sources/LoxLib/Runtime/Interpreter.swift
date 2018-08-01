@@ -40,17 +40,21 @@ class Interpreter
     private func execute(_ statement: Statement) throws
     {
         switch statement {
-            case let .print(expression):
-                let value = try self.evaluate(expression)
-                print(self.stringify(value))
+            case let .variableDecl(name: name, initializer: expression):
+                try self.evaluateVariableDecl(name: name, initializer: expression)
             case let .expression(expression):
                 let value = try self.evaluate(expression)
                 if self.isRepl {
                     print(self.stringify(value))
                     try self.environment.updateCut(value: value)
                 }
-            case let .variableDecl(name: name, initializer: expression):
-                try self.evaluateVariableDecl(name: name, initializer: expression)
+            case let .conditional(condition, then: thenBranch, else: elseBranch):
+                try self.executeConditional(condition,
+                                            thenBranch: thenBranch,
+                                            elseBranch: elseBranch)
+            case let .print(expression):
+                let value = try self.evaluate(expression)
+                print(self.stringify(value))
             case let .block(statements):
                 try self.executeBlock(statements)
         }
@@ -90,6 +94,19 @@ class Interpreter
         try self.environment.assign(variable: name, value: evaluated)
 
         return evaluated
+    }
+
+    //MARK:- Conditional
+
+    private func executeConditional(_ condition: Expression, thenBranch: Statement, elseBranch: Statement?) throws
+    {
+        let conditionValue = try self.evaluate(condition)
+        if self.truthValue(of: conditionValue) {
+            try self.execute(thenBranch)
+        }
+        else {
+            try elseBranch.flatMap(self.execute)
+        }
     }
 
     //MARK:- Blocks

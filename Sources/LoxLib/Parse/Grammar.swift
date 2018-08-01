@@ -27,6 +27,8 @@ enum Statement : Equatable
     case variableDecl(name: Token, initializer: Expression?)
     /** A statment consisting of an expression. */
     case expression(Expression)
+    /** A statement that conditionally executes a set of other statements. */
+    indirect case conditional(Expression, then: Statement, else: Statement?)
     /** A statement for displaying an expression as output to the user. */
     case print(Expression)
     /** A brace-enclosed series of other statements. */

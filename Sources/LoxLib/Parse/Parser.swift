@@ -70,6 +70,10 @@ class Parser
 
     private func statement() throws -> Statement
     {
+        if self.matchAny(.if) {
+            return try self.finishIfStatement()
+        }
+
         if self.matchAny(.print) {
             return try self.finishPrintStatement()
         }
@@ -79,6 +83,20 @@ class Parser
         }
 
         return try self.finishExpressionStatement()
+    }
+
+    private func finishIfStatement() throws -> Statement
+    {
+        try self.mustConsume(.leftParen,
+                             message: "Parenthesized condition required for 'if'")
+        let condition = try self.expression()
+        try self.mustConsume(.rightParen,
+                             message: "Parenthesized condition required for 'if'")
+
+        let thenBranch = try self.statement()
+        let elseBranch = self.matchAny(.else) ? try self.statement() : nil
+
+        return .conditional(condition, then: thenBranch, else: elseBranch)
     }
 
     private func finishPrintStatement() throws -> Statement
@@ -324,6 +342,9 @@ class Parser
     private func synchronize()
     {
         while !self.isAtEnd {
+
+            self.advanceIndex()
+
             // Moved past problematic statement
             if self.previous.kind == .semicolon { return }
 
@@ -338,7 +359,7 @@ class Parser
                 case .return:
                     return
                 default:
-                    self.advanceIndex()
+                    continue
             }
         }
     }

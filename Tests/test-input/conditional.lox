@@ -1,0 +1,30 @@
+var a = 12;
+var b = 5;
+
+if (a < b) {
+    print "Upside-down";
+}
+else {
+    print "Everything is okay";
+}
+
+var c;
+if (nil) {
+    c = 17;
+}
+else if (false) {
+    c = 1001;
+}
+else {
+    if ("truthy") c = "hi, mom!";
+    else c = nil;
+}
+
+print c;
+
+if (12 < 10)
+    if (100 > 120)
+        print "Compare";
+    else
+        print "contrast";
+// No output; else belongs to inner if
