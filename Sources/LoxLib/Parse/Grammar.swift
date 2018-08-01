@@ -18,6 +18,8 @@ indirect enum Expression : Equatable
     case binary(left: Expression, op: Token, right: Expression)
     /** An expression binding a new value to a variable. */
     case assignment(name: Token, value: Expression)
+    /** An expression combining two subexpressions with a logical operator. */
+    case logical(left: Expression, op: Token, right: Expression)
 }
 
 /** An element of Lox grammar that produces an effect. */

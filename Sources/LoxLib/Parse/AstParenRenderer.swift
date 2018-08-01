@@ -29,6 +29,8 @@ class AstParenRenderer
                 return self.parenthesize(op.lexeme, leftSubexpression, rightSubexpression)
             case let .assignment(name: name, value: value):
                 return self.parenthesize("SET ${\(name.lexeme)}", value)
+            case let .logical(left: leftSubexpression, op: op, right: rightSubexpression):
+                return self.parenthesize(op.lexeme, leftSubexpression, rightSubexpression)
         }
     }
 

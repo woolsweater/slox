@@ -70,13 +70,15 @@ class Interpreter
             case let .variable(name):
                 return try self.environment.read(variable: name)
             case let .unary(op: opToken, operand):
-                return try self.interpretUnary(op: opToken, operand)
+                return try self.evaluateUnary(op: opToken, operand)
             case let .binary(left: left, op: opToken, right: right):
-                return try self.interpretBinary(leftExpr: left,
+                return try self.evaluateBinary(leftExpr: left,
                                                       op: opToken,
                                                rightExpr: right)
             case let .assignment(name: name, value: value):
                 return try self.evaluateAssignment(name: name, value: value)
+            case let .logical(left: left, op: op, right: right):
+                return try self.evaluateLogical(leftExpr: left, op: op, rightExpr: right)
         }
     }
 
@@ -123,7 +125,7 @@ class Interpreter
 
     //MARK:- Unary
 
-    private func interpretUnary(op: Token, _ expression: Expression) throws -> LoxValue
+    private func evaluateUnary(op: Token, _ expression: Expression) throws -> LoxValue
     {
         let operandValue = try self.evaluate(expression)
 
@@ -140,7 +142,9 @@ class Interpreter
         }
     }
 
-    private func interpretBinary(leftExpr: Expression, op: Token, rightExpr: Expression) throws -> LoxValue
+    //MARK:- Binary
+
+    private func evaluateBinary(leftExpr: Expression, op: Token, rightExpr: Expression) throws -> LoxValue
     {
         let leftValue = try self.evaluate(leftExpr)
         let rightValue = try self.evaluate(rightExpr)
@@ -182,8 +186,27 @@ class Interpreter
             case .comma:
                 return rightValue
             default:
-                fatalError("Found invalid binary operator \(op.kind)")
+                fatalError("Found invalid binary operator '\(op.kind)'")
         }
+    }
+
+    //MARK:- Logical binary
+
+    private func evaluateLogical(leftExpr: Expression, op: Token, rightExpr: Expression) throws -> LoxValue
+    {
+        let leftValue = try self.evaluate(leftExpr)
+        let isLeftTrue = self.truthValue(of: leftValue)
+
+        switch op.kind {
+            case .or:
+                if isLeftTrue { return leftValue }
+            case .and:
+                if !(isLeftTrue) { return leftValue }
+            default:
+                fatalError("Found non-logical operator '\(op.kind)' in logical expression")
+        }
+
+        return try self.evaluate(rightExpr)
     }
 
     //MARK:- Helper

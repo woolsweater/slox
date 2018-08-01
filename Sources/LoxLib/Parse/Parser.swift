@@ -163,7 +163,7 @@ class Parser
         // We do not want to use arbitrary-length lookahead here to validate
         // the assignment right off the bat. Instead, we parse the left-hand
         // side first...
-        let lvalue = try self.equality()
+        let lvalue = try self.or()
 
         guard self.matchAny(.equal) else {
             return lvalue
@@ -178,6 +178,42 @@ class Parser
         let rvalue = try self.assignment()
 
         return .assignment(name: name, value: rvalue)
+    }
+
+    private func or() throws -> Expression
+    {
+        if self.matchAny(.or) {
+            _ = self.reportParseError(message: "Missing lefthand expression.")
+            return try self.or()
+        }
+
+        var expr = try self.and()
+
+        while self.matchAny(.or) {
+            let op = self.previous
+            let right = try self.and()
+            expr = .logical(left: expr, op: op, right: right)
+        }
+
+        return expr
+    }
+
+    private func and() throws -> Expression
+    {
+        if self.matchAny(.and) {
+            _ = self.reportParseError(message: "Missing lefthand expression.")
+            return try self.and()
+        }
+
+        var expr = try self.equality()
+
+        while self.matchAny(.and) {
+            let op = self.previous
+            let right = try self.equality()
+            expr = .logical(left: expr, op: op, right: right)
+        }
+
+        return expr
     }
 
     private func equality() throws -> Expression

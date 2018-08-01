@@ -20,8 +20,14 @@ joined         → assignment ( "," assignment )
 join-error     → "," joined ;
 assignment     → IDENTIFIER "=" assignment
                | assign-error
-               | equality ;
-assign-error   → "=" equality ;
+               | logical_or ;
+assign-error   → "=" logical_or ;
+logical-or     → logical-and ( "or" logical-and )*
+               | or-error ;
+or-error      → "," logical-or ;               
+logical-and    → equality ( "and" equality )*
+               | and-error;
+and-error      → "," logical-and ;               
 equality       → comparison ( ( "!=" | "==" ) comparison )*
                | equal-error ;
 equal-error    → ( "!=" | "==" ) equality ;

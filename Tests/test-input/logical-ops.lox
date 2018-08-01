@@ -1,0 +1,20 @@
+var a = nil;
+var b = "It's a bee!";
+var c = a or b;
+print c;
+
+if (a and b) {
+    print "Success!";
+}
+else if (a) {
+    print "Halfway";
+}
+else if (b) {
+    print "No, the other half";
+}
+else {
+    print "Total bummer";
+}
+
+print ((((10 * 2) + 5) - 20) == 10) or
+        ((false or "There's") and (nil or "a snake") or "in my boot!");
