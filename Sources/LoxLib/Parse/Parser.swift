@@ -70,7 +70,7 @@ class Parser
 
     private func statement() throws -> Statement
     {
-        if self.matchAny(.if) {
+        if self.matchAny(.if, .unless) {
             return try self.finishIfStatement()
         }
 
@@ -87,14 +87,24 @@ class Parser
 
     private func finishIfStatement() throws -> Statement
     {
-        try self.mustConsume(.leftParen,
-                             message: "Parenthesized condition required for 'if'")
-        let condition = try self.expression()
-        try self.mustConsume(.rightParen,
-                             message: "Parenthesized condition required for 'if'")
+        let negated = (self.previous.kind == .unless)
+        let statementLine = self.previous.line
+        let parenMessage = "Parenthesized condition required for '\(negated ? "unless" : "if")'"
+
+        try self.mustConsume(.leftParen, message: parenMessage)
+        var condition = try self.expression()
+        if negated {
+            let bang = Token.bang(at: statementLine)
+            condition = .unary(op: bang, condition)
+        }
+        try self.mustConsume(.rightParen, message: parenMessage)
 
         let thenBranch = try self.statement()
         let elseBranch = self.matchAny(.else) ? try self.statement() : nil
+
+        if negated && elseBranch != nil {
+            _ = self.reportParseError(message: "'unless' cannot have an 'else' clause.")
+        }
 
         return .conditional(condition, then: thenBranch, else: elseBranch)
     }
@@ -402,4 +412,3 @@ class Parser
 
     private struct ParseError : Error {}
 }
-

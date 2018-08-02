@@ -15,6 +15,18 @@ typealias ComparisonOperation = (Double, Double) -> Bool
 extension Token
 {
     /**
+     Synthesize a `!` token for an `unless` statement, which is
+     just sugar for an `if` with a negated condition.
+     */
+    static func bang(at lineNumber: Int) -> Token
+    {
+        return Token(kind: .bang,
+                   lexeme: "!",
+                  literal: nil,
+                     line: lineNumber)
+    }
+
+    /**
      The `ArithmeticOperation` represented by this token kind, or `nil`
      if this token does not represent an arithmetic operator.
      */

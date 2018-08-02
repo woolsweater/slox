@@ -10,7 +10,8 @@ statement      → exprStmt
                | printStmt
                | block ;
 exprStmt       → expression ";" ;
-ifStmt         → "if" "(" expression ")" statement ( "else" statement )? ;
+ifStmt         → "if" "(" expression ")" statement ( "else" statement )?
+               | "unless" "(" expression ")" statement ;
 printStmt      → "print" expression ";" ;
 block          → "{" declaration* "}"
 

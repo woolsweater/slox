@@ -1,0 +1,24 @@
+var a = false;
+
+unless (a) {
+    print "Wow, snazzy!";
+}
+
+if (!a) {
+    print "Boring!";
+}
+
+var b = nil;
+unless (b) {
+    print "Fail";
+}
+
+var c = "original";
+unless (c) {
+    c = "altered";
+}
+// else {
+//    print "Sir Not-appearing-in-this-grammar";
+// }
+
+print c;
