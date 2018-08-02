@@ -70,6 +70,10 @@ class Parser
 
     private func statement() throws -> Statement
     {
+        if self.matchAny(.for) {
+            return try self.finishForStatement()
+        }
+
         if self.matchAny(.if, .unless) {
             return try self.finishIfStatement()
         }
@@ -87,6 +91,39 @@ class Parser
         }
 
         return try self.finishExpressionStatement()
+    }
+
+    private func finishForStatement() throws -> Statement
+    {
+        try self.mustConsume(.leftParen, message: "Expected '(' after 'for'.")
+
+        let initializer: Statement?
+        if self.matchAny(.semicolon) {
+            initializer = nil
+        }
+        else if self.matchAny(.var) {
+            initializer = try self.variableDecl()
+        }
+        else {
+            initializer = try self.finishExpressionStatement()
+        }
+
+        let condition = self.check(.semicolon) ? .literal(.bool(true)) : try self.expression()
+        try self.mustConsume(.semicolon, message: "Expected ';' after loop condition.")
+
+        let increment = self.check(.rightParen) ? nil : try self.expression()
+        try self.mustConsume(.rightParen, message: "Expected ')' to terminate 'for' clauses.")
+
+        var body = try self.statement()
+        if let increment = increment {
+            body = .block([body, .expression(increment)])
+        }
+        body = .loop(condition: condition, body: body)
+        if let initializer = initializer {
+            body = .block([initializer, body])
+        }
+
+        return body
     }
 
     private func finishIfStatement() throws -> Statement
