@@ -14,7 +14,7 @@ exprStmt       → expression ";" ;
 ifStmt         → "if" "(" expression ")" statement ( "else" statement )?
                | "unless" "(" expression ")" statement ;
 printStmt      → "print" expression ";" ;
-whileStmt      → "while" "(" expression ")" statement ;
+whileStmt      → ( "while" | "until" ) "(" expression ")" statement ;
 block          → "{" declaration* "}"
 
 expression     → joined ;

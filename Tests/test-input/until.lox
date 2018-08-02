@@ -1,0 +1,6 @@
+var a = 10;
+
+until (a <= 0) {
+    print a;
+    a = a - 1;
+}

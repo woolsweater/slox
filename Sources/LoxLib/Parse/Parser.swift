@@ -78,7 +78,7 @@ class Parser
             return try self.finishPrintStatement()
         }
 
-        if self.matchAny(.while) {
+        if self.matchAny(.while, .until) {
             return try self.finishLoopStatement()
         }
 
@@ -123,11 +123,16 @@ class Parser
 
     private func finishLoopStatement() throws -> Statement
     {
-        //TODO: Until loop
-        let parenMessage = "Parenthesized condition required for 'while'"
+        let negated = (self.previous.kind == .until)
+        let statementLine = self.previous.line
+        let parenMessage = "Parenthesized condition required for '\(negated ? "until" : "while")'"
 
         try self.mustConsume(.leftParen, message: parenMessage)
-        let condition = try self.expression()
+        var condition = try self.expression()
+        if negated {
+            let bang = Token.bang(at: statementLine)
+            condition = .unary(op: bang, condition)
+        }
         try self.mustConsume(.rightParen, message: parenMessage)
 
         let body = try self.statement()

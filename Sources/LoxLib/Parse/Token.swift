@@ -50,7 +50,7 @@ extension Token
 
         // Keywords
         case and, `class`, `else`, `false`, fun, `for`, `if`, `nil`, or
-        case print, `return`, `super`, this, `true`, unless, `var`, `while`
+        case print, `return`, `super`, this, `true`, unless, until, `var`, `while`
 
         case EOF
     }
@@ -76,6 +76,7 @@ extension Token.Kind
             case "this": self = .this
             case "true": self = .true
             case "unless": self = .unless
+            case "until": self = .until
             case "var": self = .var
             case "while": self = .while
             default:
