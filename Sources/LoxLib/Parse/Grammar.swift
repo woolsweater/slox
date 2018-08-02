@@ -33,6 +33,11 @@ enum Statement : Equatable
     indirect case conditional(Expression, then: Statement, else: Statement?)
     /** A statement for displaying an expression as output to the user. */
     case print(Expression)
+    /**
+     A statement that repeatedly executes a substatement (usually a block) until a
+     condition evaluates to false.
+     */
+    indirect case loop(condition: Expression, body: Statement)
     /** A brace-enclosed series of other statements. */
     indirect case block([Statement])
 }

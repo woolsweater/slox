@@ -55,6 +55,8 @@ class Interpreter
             case let .print(expression):
                 let value = try self.evaluate(expression)
                 print(self.stringify(value))
+            case let .loop(condition: condition, body: body):
+                try self.executeLoop(condition: condition, body: body)
             case let .block(statements):
                 try self.executeBlock(statements)
         }
@@ -108,6 +110,15 @@ class Interpreter
         }
         else {
             try elseBranch.flatMap(self.execute)
+        }
+    }
+
+    //MARK:- Loop
+
+    private func executeLoop(condition: Expression, body: Statement) throws
+    {
+        while try self.truthValue(of: self.evaluate(condition)) {
+            try self.execute(body)
         }
     }
 

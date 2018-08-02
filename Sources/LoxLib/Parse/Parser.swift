@@ -78,6 +78,10 @@ class Parser
             return try self.finishPrintStatement()
         }
 
+        if self.matchAny(.while) {
+            return try self.finishLoopStatement()
+        }
+
         if self.matchAny(.leftBrace) {
             return try .block(self.finishBlock())
         }
@@ -115,6 +119,20 @@ class Parser
         try self.mustConsume(.semicolon,
                              message: "Expected ';' to terminate print statement.")
         return .print(expression)
+    }
+
+    private func finishLoopStatement() throws -> Statement
+    {
+        //TODO: Until loop
+        let parenMessage = "Parenthesized condition required for 'while'"
+
+        try self.mustConsume(.leftParen, message: parenMessage)
+        let condition = try self.expression()
+        try self.mustConsume(.rightParen, message: parenMessage)
+
+        let body = try self.statement()
+
+        return .loop(condition: condition, body: body)
     }
 
     private func finishBlock() throws -> [Statement]

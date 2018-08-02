@@ -1,0 +1,15 @@
+var a = 10;
+while (a > 5) {
+    print a;
+    a = a - 1;
+}
+
+// Fibbing
+var n_2 = 0;
+var n_1 = 1;
+while (n_1 + n_2 < 100) {
+    var n = n_1 + n_2;
+    print n;
+    n_2 = n_1;
+    n_1 = n;
+}
