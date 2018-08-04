@@ -49,7 +49,7 @@ extension Token
         case identifier, string, number
 
         // Keywords
-        case and, `class`, `else`, `false`, fun, `for`, `if`, `nil`, or
+        case and, `break`, `class`, `else`, `false`, fun, `for`, `if`, `nil`, or
         case print, `return`, `super`, this, `true`, unless, until, `var`, `while`
 
         case EOF
@@ -62,6 +62,7 @@ extension Token.Kind
     {
         switch keyword {
             case "and": self = .and
+            case "break": self = .break
             case "class": self = .class
             case "else": self = .else
             case "false": self = .false

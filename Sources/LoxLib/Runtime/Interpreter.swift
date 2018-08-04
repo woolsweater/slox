@@ -57,6 +57,8 @@ class Interpreter
                 print(self.stringify(value))
             case let .loop(condition: condition, body: body):
                 try self.executeLoop(condition: condition, body: body)
+            case .breakLoop:
+                throw BreakLoop()
             case let .block(statements):
                 try self.executeBlock(statements)
         }
@@ -117,8 +119,16 @@ class Interpreter
 
     private func executeLoop(condition: Expression, body: Statement) throws
     {
-        while try self.truthValue(of: self.evaluate(condition)) {
-            try self.execute(body)
+        do {
+            while try self.truthValue(of: self.evaluate(condition)) {
+                try self.execute(body)
+            }
+        }
+        catch is BreakLoop {
+            return
+        }
+        catch {
+            throw error
         }
     }
 

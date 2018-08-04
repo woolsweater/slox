@@ -5,6 +5,12 @@ class Parser
     private let tokens: [Token]
     private var index: Int = 0
 
+    /**
+     Track levels of looping so that a `break` statment outside any
+     loop can be reported as an error.
+     */
+    private var loopState = NestingCounter()
+
     private var isAtEnd: Bool
     {
         return self.peek().kind == .EOF
@@ -86,6 +92,10 @@ class Parser
             return try self.finishLoopStatement()
         }
 
+        if self.matchAny(.break) {
+            return try self.finishBreakStatement()
+        }
+
         if self.matchAny(.leftBrace) {
             return try .block(self.finishBlock())
         }
@@ -113,6 +123,9 @@ class Parser
 
         let increment = self.check(.rightParen) ? nil : try self.expression()
         try self.mustConsume(.rightParen, message: "Expected ')' to terminate 'for' clauses.")
+
+        self.loopState++
+        defer { self.loopState-- }
 
         var body = try self.statement()
         if let increment = increment {
@@ -172,9 +185,22 @@ class Parser
         }
         try self.mustConsume(.rightParen, message: parenMessage)
 
+        self.loopState++
+        defer { self.loopState-- }
+
         let body = try self.statement()
 
         return .loop(condition: condition, body: body)
+    }
+
+    private func finishBreakStatement() throws -> Statement
+    {
+        try self.mustConsume(.semicolon, message: "Unterminated 'break' statement.")
+        if !(self.loopState.isNested) {
+            _ = self.reportParseError(message: "Cannot 'break' outside a loop.")
+        }
+
+        return .breakLoop
     }
 
     private func finishBlock() throws -> [Statement]

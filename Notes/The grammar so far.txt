@@ -10,6 +10,7 @@ statement      → exprStmt
                | ifStmt
                | printStmt
                | whileStmt
+               | breakStmt
                | block ;
 exprStmt       → expression ";" ;
 forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
@@ -19,7 +20,8 @@ ifStmt         → "if" "(" expression ")" statement ( "else" statement )?
                | "unless" "(" expression ")" statement ;
 printStmt      → "print" expression ";" ;
 whileStmt      → ( "while" | "until" ) "(" expression ")" statement ;
-block          → "{" declaration* "}"
+breakStmt      → "break" ";" ;
+block          → "{" declaration* "}" ;
 
 expression     → joined ;
 joined         → assignment ( "," assignment )
@@ -31,10 +33,10 @@ assignment     → IDENTIFIER "=" assignment
 assign-error   → "=" logical_or ;
 logical-or     → logical-and ( "or" logical-and )*
                | or-error ;
-or-error      → "," logical-or ;               
+or-error       → "or" logical-or ;               
 logical-and    → equality ( "and" equality )*
                | and-error;
-and-error      → "," logical-and ;               
+and-error      → "and" logical-and ;               
 equality       → comparison ( ( "!=" | "==" ) comparison )*
                | equal-error ;
 equal-error    → ( "!=" | "==" ) equality ;

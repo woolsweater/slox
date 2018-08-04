@@ -1,0 +1,42 @@
+while (true) {
+    for (var i = 0; ; i = i + 1) {
+        break; 
+        print "Can't get here from there";
+    }
+    print "Broke from 'for'";
+    {{{{{break;}}}}}
+    print "Infinite?";
+}
+
+print "
+---
+";
+
+var dividend = 3;
+for (var i = 0; i < 10; i = i + 1) {
+    print i;
+    for (var j = i; ; j = j - dividend) {
+        if (j == dividend) {
+            print "Divisible";
+            break;
+        }
+        else if (j < dividend) {
+            print "Not divisible";
+            break;
+        }
+    }
+}
+
+print "
+---
+";
+
+var x = 1;
+var d = 8;
+until (x >= 1000) {
+    x = x * 2;
+    print x;
+    if (x / d == d) {
+        break;
+    }
+}

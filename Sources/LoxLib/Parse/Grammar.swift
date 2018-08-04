@@ -38,6 +38,11 @@ enum Statement : Equatable
      condition evaluates to false.
      */
     indirect case loop(condition: Expression, body: Statement)
+    /**
+     A statement that immediately moves control to the end of the innermost
+     enclosing loop.
+     */
+    case breakLoop;
     /** A brace-enclosed series of other statements. */
     indirect case block([Statement])
 }
