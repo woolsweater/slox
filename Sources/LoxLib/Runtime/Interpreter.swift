@@ -3,10 +3,16 @@ import Foundation
 class Interpreter
 {
     /**
+     Top-level evironment which holds builtins and other internal values,
+     such as the REPL's "cut".
+     */
+    var globals = Environment()
+
+    /**
      Variable/value pairs in the current scope. Changes as blocks are entered
      and exited.
      */
-    private var environment = Environment()
+    private var environment: Environment!
 
     /**
      Whether the interpreter is running in a REPL instead of interpreting a
@@ -19,8 +25,10 @@ class Interpreter
     {
         self.isRepl = replMode
         if self.isRepl {
-            self.environment.createCut()
+            self.globals.createCut()
         }
+        self.globals.defineFunc(Callable.clock)
+        self.environment = globals
     }
 
     func interpret(_ program: [Statement]) {
@@ -40,13 +48,15 @@ class Interpreter
     private func execute(_ statement: Statement) throws
     {
         switch statement {
+            case let .functionDecl(name: name, parameters: parameters, body: body):
+                self.evaluateFunctionDecl(name: name, parameters: parameters, body: body)
             case let .variableDecl(name: name, initializer: expression):
                 try self.evaluateVariableDecl(name: name, initializer: expression)
             case let .expression(expression):
                 let value = try self.evaluate(expression)
                 if self.isRepl {
                     print(self.stringify(value))
-                    try self.environment.updateCut(value: value)
+                    try self.globals.updateCut(value: value)
                 }
             case let .conditional(condition, then: thenBranch, else: elseBranch):
                 try self.executeConditional(condition,
@@ -55,12 +65,14 @@ class Interpreter
             case let .print(expression):
                 let value = try self.evaluate(expression)
                 print(self.stringify(value))
+            case let .return(token, value: value):
+                try self.executeReturn(token, value: value)
             case let .loop(condition: condition, body: body):
                 try self.executeLoop(condition: condition, body: body)
             case .breakLoop:
                 throw BreakLoop()
             case let .block(statements):
-                try self.executeBlock(statements)
+                try self.executeBlock(statements, environment: Environment(nestedIn: self.environment))
         }
     }
 
@@ -73,6 +85,8 @@ class Interpreter
                 return try self.evaluate(groupedExpression)
             case let .variable(name):
                 return try self.environment.read(variable: name)
+            case let .call(callee, paren: paren, arguments: arguments):
+                return try self.evaluateCall(to: callee, passing: arguments, paren: paren)
             case let .unary(op: opToken, operand):
                 return try self.evaluateUnary(op: opToken, operand)
             case let .binary(left: left, op: opToken, right: right):
@@ -84,6 +98,17 @@ class Interpreter
             case let .logical(left: left, op: op, right: right):
                 return try self.evaluateLogical(leftExpr: left, op: op, rightExpr: right)
         }
+    }
+
+    //MARK:- Function definition
+
+    private func evaluateFunctionDecl(name: Token, parameters: [Token], body: [Statement])
+    {
+        let function = Callable.fromDecl(name: name,
+                                   parameters: parameters,
+                                         body: body,
+                                  environment: self.environment)
+        self.environment.defineFunc(function)
     }
 
     //MARK:- Variables
@@ -115,6 +140,14 @@ class Interpreter
         }
     }
 
+    //MARK:- Return statement
+
+    private func executeReturn(_ keyword: Token, value: Expression?) throws
+    {
+        let returnValue = try value.flatMap(self.evaluate)
+        throw Return(value: returnValue ?? .nil)
+    }
+
     //MARK:- Loop
 
     private func executeLoop(condition: Expression, body: Statement) throws
@@ -134,14 +167,38 @@ class Interpreter
 
     //MARK:- Blocks
 
-    private func executeBlock(_ statements: [Statement]) throws
+    /**
+     Execute each statement in the list in order.
+     - remark: Needs to be visible to `Callable.fromDecl()` for function
+     definitions, hence it is not private.
+     */
+    func executeBlock(_ statements: [Statement], environment: Environment) throws
     {
-        self.environment = Environment(nestedIn: self.environment)
-        defer { self.environment = self.environment.enclosing! }
+        let previousEnvironment = self.environment
+        self.environment = environment
+        defer { self.environment = previousEnvironment }
 
         for statement in statements {
             try self.execute(statement)
         }
+    }
+
+    //MARK:- Function invocation
+
+    private func evaluateCall(to calleeExpr: Expression,
+                              passing argExprs: [Expression],
+                              paren: Token)
+        throws -> LoxValue
+    {
+        let callee = try self.evaluate(calleeExpr)
+
+        let arguments = try argExprs.map({ try self.evaluate($0) })
+
+        guard case let .callable(function) = callee else {
+            throw RuntimeError.notCallable(at: paren)
+        }
+
+        return try function.invoke(using: self, at: paren, arguments: arguments)
     }
 
     //MARK:- Unary
@@ -253,6 +310,8 @@ class Interpreter
                 return string
             case let .bool(bool):
                 return String(describing: bool)
+            case let .callable(function):
+                return String(describing: function)
             case .nil:
                 return "nil"
         }
@@ -275,14 +334,6 @@ class Interpreter
         Lox.report(at: token.line,
              location: "at \(locationDescription)",
               message: error.message)
-    }
-}
-
-private extension RuntimeError
-{
-    static func numeric(at token: Token) -> RuntimeError
-    {
-        return RuntimeError(token: token, message: "Operand must be a number")
     }
 }
 

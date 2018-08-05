@@ -11,6 +11,25 @@ class Parser
      */
     private var loopState = NestingCounter()
 
+    /**
+     Track levels of function declarations so that a `return`
+     statement outside a function can be reported as an error.
+     */
+    private var funcState = NestingCounter()
+
+    /**
+     Track levels of parentheses so that commas inside argument lists
+     can be parsed correctly.
+     */
+    private var parenState = NestingCounter()
+
+    /**
+     Flag indicating that we are parsing a function call's argument list.
+     - remark: This is required to handle commas correctly, given the
+     existence of 'joined' expressions.
+     */
+    private var isInArgumentList = false
+
     private var isAtEnd: Bool
     {
         return self.peek().kind == .EOF
@@ -46,6 +65,9 @@ class Parser
     private func declaration() -> Statement?
     {
         do {
+            if self.matchAny(.fun) {
+                return try self.functionDecl("function")
+            }
             if self.matchAny(.var) {
                 return try self.variableDecl()
             }
@@ -54,9 +76,56 @@ class Parser
             }
         }
         catch {
+            if let parseError = error as? ParseError {
+                self.reportParseError(message: parseError.message)
+            }
             self.synchronize()
             return nil
         }
+    }
+
+    /**
+     Parse a function or method declaration. The `kind` argument describes which,
+     for error reporting.
+     */
+    private func functionDecl(_ kind: String) throws -> Statement
+    {
+        try self.mustConsume(.identifier, message: "Missing name for \(kind).")
+        let name = previous
+        try self.mustConsume(.leftParen, message: "Expected '(' to start parameter list.")
+
+        let parameters = try self.parameters()
+
+        try self.mustConsume(.leftBrace, message: "Expected '{' to start \(kind) body.")
+
+        self.funcState++
+        defer { self.funcState-- }
+
+        let body = try self.finishBlock()
+
+        return .functionDecl(name: name, parameters: parameters, body: body)
+    }
+
+    private func parameters() throws -> [Token]
+    {
+        guard !(self.matchAny(.rightParen)) else { return [] }
+
+        var parameters: [Token] = []
+        repeat {
+            try self.mustConsume(.identifier, message: "Expected parameter name.")
+            parameters.append(self.previous)
+        } while self.matchAny(.comma)
+
+        if parameters.count >= Config.maxFunctionArity {
+            self.reportParseError(
+                message: "Cannot have a more than \(Config.maxFunctionArity) parameters"
+            )
+            // Note that they are parsed anyways
+        }
+
+        try self.mustConsume(.rightParen, message: "Expected ')' to terminate parameter list.")
+
+        return parameters
     }
 
     private func variableDecl() throws -> Statement
@@ -86,6 +155,10 @@ class Parser
 
         if self.matchAny(.print) {
             return try self.finishPrintStatement()
+        }
+
+        if self.matchAny(.return) {
+            return try self.finishReturnStatement()
         }
 
         if self.matchAny(.while, .until) {
@@ -157,7 +230,7 @@ class Parser
         let elseBranch = self.matchAny(.else) ? try self.statement() : nil
 
         if negated && elseBranch != nil {
-            _ = self.reportParseError(message: "'unless' cannot have an 'else' clause.")
+            self.reportParseError(message: "'unless' cannot have an 'else' clause.")
         }
 
         return .conditional(condition, then: thenBranch, else: elseBranch)
@@ -169,6 +242,20 @@ class Parser
         try self.mustConsume(.semicolon,
                              message: "Expected ';' to terminate print statement.")
         return .print(expression)
+    }
+
+    private func finishReturnStatement() throws -> Statement
+    {
+        if !(self.funcState.isNested) {
+            self.reportParseError(message: "Cannot 'return' outside of a function.")
+        }
+
+        let token = self.previous
+        let value = self.check(.semicolon) ? nil : try self.expression()
+        try self.mustConsume(.semicolon,
+                             message: "Expected ';' to termianate return statement.")
+
+        return .return(token, value: value)
     }
 
     private func finishLoopStatement() throws -> Statement
@@ -197,7 +284,7 @@ class Parser
     {
         try self.mustConsume(.semicolon, message: "Unterminated 'break' statement.")
         if !(self.loopState.isNested) {
-            _ = self.reportParseError(message: "Cannot 'break' outside a loop.")
+            self.reportParseError(message: "Cannot 'break' outside a loop.")
         }
 
         return .breakLoop
@@ -234,11 +321,15 @@ class Parser
     private func joined() throws -> Expression
     {
         if self.matchAny(.comma) {
-            _ = self.reportParseError(message: "Missing lefthand expression")
+            self.reportParseError(message: "Missing lefthand expression")
             return try self.joined()
         }
 
         var expr = try self.assignment()
+
+        if self.isInArgumentList && !(self.parenState.isNested) {
+            return expr
+        }
 
         while self.matchAny(.comma) {
             let op = self.previous
@@ -252,7 +343,7 @@ class Parser
     private func assignment() throws -> Expression
     {
         if self.matchAny(.equal) {
-            _ = self.reportParseError(message: "Missing lefthand expression")
+            self.reportParseError(message: "Missing lefthand expression")
             return try self.assignment()
         }
 
@@ -267,7 +358,7 @@ class Parser
 
         // then look*behind* to make sure we have a valid assignment target
         guard case let .variable(name: name) = lvalue else {
-            _ = self.reportParseError(message: "Invalid lvalue in assignment")
+            self.reportParseError(message: "Invalid lvalue in assignment")
             return lvalue
         }
 
@@ -279,7 +370,7 @@ class Parser
     private func or() throws -> Expression
     {
         if self.matchAny(.or) {
-            _ = self.reportParseError(message: "Missing lefthand expression.")
+            self.reportParseError(message: "Missing lefthand expression.")
             return try self.or()
         }
 
@@ -297,7 +388,7 @@ class Parser
     private func and() throws -> Expression
     {
         if self.matchAny(.and) {
-            _ = self.reportParseError(message: "Missing lefthand expression.")
+            self.reportParseError(message: "Missing lefthand expression.")
             return try self.and()
         }
 
@@ -315,7 +406,7 @@ class Parser
     private func equality() throws -> Expression
     {
         if self.matchAny(.bangEqual, .equalEqual) {
-            _ = self.reportParseError(message: "Missing lefthand expression")
+            self.reportParseError(message: "Missing lefthand expression")
             return try self.equality()
         }
 
@@ -333,7 +424,7 @@ class Parser
     private func comparison() throws -> Expression
     {
         if self.matchAny(.greater, .greaterEqual, .less, .lessEqual) {
-            _ = self.reportParseError(message: "Missing lefthand expression")
+            self.reportParseError(message: "Missing lefthand expression")
             return try self.comparison()
         }
 
@@ -351,7 +442,7 @@ class Parser
     private func addition() throws -> Expression
     {
         if self.matchAny(.plus) {
-            _ = self.reportParseError(message: "Missing lefthand expression")
+            self.reportParseError(message: "Missing lefthand expression")
             return try self.addition()
         }
 
@@ -382,12 +473,51 @@ class Parser
     private func unary() throws -> Expression
     {
         guard self.matchAny(.bang, .minus) else {
-            return try self.primary()
+            return try self.call()
         }
 
         let op = self.previous
         let subexpr = try self.unary()
         return .unary(op: op, subexpr)
+    }
+
+    private func call() throws -> Expression
+    {
+        var expr = try self.primary()
+
+        //TODO: This loop will make more sense when dot expressions are added
+        while true {
+            guard self.matchAny(.leftParen) else { break }
+            expr = try self.finishCall(to: expr)
+        }
+
+        return expr
+    }
+
+    private func finishCall(to callee: Expression) throws -> Expression
+    {
+        var arguments: [Expression] = []
+
+        if !self.check(.rightParen) {
+
+            self.isInArgumentList = true
+            defer { self.isInArgumentList = false }
+
+            repeat {
+                arguments.append(try self.expression())
+            } while self.matchAny(.comma)
+        }
+
+        if arguments.count > Config.maxFunctionArity {
+            self.reportParseError(
+                message: "Cannot have a more than \(Config.maxFunctionArity) arguments"
+            )
+            // Note that they are parsed anyways
+        }
+
+        try self.mustConsume(.rightParen, message: "Missing closing ')' for argument list.")
+
+        return .call(callee, paren: self.previous, arguments: arguments)
     }
 
     private func primary() throws -> Expression
@@ -405,13 +535,16 @@ class Parser
         }
 
         if self.matchAny(.leftParen) {
+            self.parenState++
+            defer { self.parenState-- }
+
             let expr = try self.expression()
             try self.mustConsume(.rightParen,
                                  message: "Expected ')' to match earlier '('")
             return .grouping(expr)
         }
 
-        throw self.reportParseError(message: "No expression found")
+        throw ParseError(message: "No expression found")
     }
 
     //MARK:- Utility
@@ -450,20 +583,19 @@ class Parser
     private func mustConsume(_ kind: Token.Kind, message: String) throws
     {
         guard self.check(kind) else {
-            throw self.reportParseError(message: message)
+            throw ParseError(message: message)
         }
 
         self.advanceIndex()
     }
 
-    private func reportParseError(message: String) -> ParseError
+    private func reportParseError(message: String)
     {
         let token = self.peek()
         let locationDescription = token.kind == .EOF ? "end" : "'\(token.lexeme)'"
         Lox.report(at: token.line,
              location: "at \(locationDescription)",
               message: message)
-        return ParseError()
     }
 
     /**
@@ -496,5 +628,8 @@ class Parser
         }
     }
 
-    private struct ParseError : Error {}
+    private struct ParseError : Error
+    {
+        let message: String
+    }
 }

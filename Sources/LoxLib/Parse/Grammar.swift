@@ -12,6 +12,12 @@ indirect enum Expression : Equatable
      stored value.
      */
     case variable(Token)
+    /**
+     An expression invoking a function.
+     - remark: The closing parenthesis of the arguments list is held for
+     error reporting.
+     */
+    case call(Expression, paren: Token, arguments: [Expression])
     /** An expression of a unary operator applied to another expresssion. */
     case unary(op: Token, Expression)
     /** An expression with two subexpressions composed with an operator. */
@@ -25,6 +31,8 @@ indirect enum Expression : Equatable
 /** An element of Lox grammar that produces an effect. */
 enum Statement : Equatable
 {
+    /** A statement declaring a named function. */
+    indirect case functionDecl(name: Token, parameters: [Token], body: [Statement])
     /** A statement declaring a variable. An initial value may be provided. */
     case variableDecl(name: Token, initializer: Expression?)
     /** A statment consisting of an expression. */
@@ -33,6 +41,8 @@ enum Statement : Equatable
     indirect case conditional(Expression, then: Statement, else: Statement?)
     /** A statement for displaying an expression as output to the user. */
     case print(Expression)
+    /** A statement providing the final value of a function invocation. */
+    case `return`(Token, value: Expression?)
     /**
      A statement that repeatedly executes a substatement (usually a block) until a
      condition evaluates to false.

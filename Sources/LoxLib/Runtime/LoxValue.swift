@@ -12,11 +12,14 @@ enum LoxValue : Equatable
     case string(String)
     /** A boolean value */
     case bool(Bool)
+    /** A value that can be invoked like a function. */
+    case callable(Callable)
     /**
-     The absence of a Lox value.
+     The absence of any other value.
      - remark: This is distinct from an *uninitialized*
-     state. Lox `nil` is a legal value, but it is an error for user
-     code to try to read a variable that has never had a value assigned.
+     state. Lox `nil` is an actual, legal value. It is an error
+     for user code to try to read a variable that has never had
+     a value assigned.
      */
     case `nil`
 }

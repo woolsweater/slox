@@ -37,6 +37,12 @@ class Environment
         self.values[name] = value
     }
 
+    /** Add a function to the environment. */
+    func defineFunc(_ callable: Callable)
+    {
+        self.define(name: callable.name, value: .callable(callable))
+    }
+
     /**
      Look up the value of the given variable, starting in the current
      scope and then looking in enclosing scopes, in order.
