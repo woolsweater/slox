@@ -37,10 +37,16 @@ class Environment
         self.values[name] = value
     }
 
-    /** Add a function to the environment. */
-    func defineFunc(_ callable: Callable)
+    /**
+     Add a function to the environment.
+     - returns: The added value, for display in a REPL.
+     */
+    @discardableResult
+    func defineFunc(_ callable: Callable) -> LoxValue
     {
-        self.define(name: callable.name, value: .callable(callable))
+        let value = LoxValue.callable(callable)
+        self.define(name: callable.name, value: value)
+        return value
     }
 
     /**

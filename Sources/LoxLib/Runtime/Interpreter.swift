@@ -48,8 +48,8 @@ class Interpreter
     private func execute(_ statement: Statement) throws
     {
         switch statement {
-            case let .functionDecl(name: name, parameters: parameters, body: body):
-                self.evaluateFunctionDecl(name: name, parameters: parameters, body: body)
+            case let .functionDecl(identifier: ident, parameters: parameters, body: body):
+                self.evaluateFunctionDecl(identifier: ident, parameters: parameters, body: body)
             case let .variableDecl(name: name, initializer: expression):
                 try self.evaluateVariableDecl(name: name, initializer: expression)
             case let .expression(expression):
@@ -85,6 +85,10 @@ class Interpreter
                 return try self.evaluate(groupedExpression)
             case let .variable(name):
                 return try self.environment.read(variable: name)
+            case let .anonFunction(id: id, parameters: parameters, body: body):
+                return self.defineFunction(name: "__unnamedFunc\(id)",
+                                     parameters: parameters,
+                                           body: body)
             case let .call(callee, paren: paren, arguments: arguments):
                 return try self.evaluateCall(to: callee, passing: arguments, paren: paren)
             case let .unary(op: opToken, operand):
@@ -102,13 +106,23 @@ class Interpreter
 
     //MARK:- Function definition
 
-    private func evaluateFunctionDecl(name: Token, parameters: [Token], body: [Statement])
+    private func evaluateFunctionDecl(identifier: Token, parameters: [Token], body: [Statement])
+    {
+        self.defineFunction(name: identifier.lexeme, parameters: parameters, body: body)
+    }
+
+    /**
+     Add a callable value to the current environment.
+     - returns: The added value, in case we are in the REPL.
+     */
+    @discardableResult
+    private func defineFunction(name: String, parameters: [Token], body: [Statement]) -> LoxValue
     {
         let function = Callable.fromDecl(name: name,
                                    parameters: parameters,
                                          body: body,
                                   environment: self.environment)
-        self.environment.defineFunc(function)
+        return self.environment.defineFunc(function)
     }
 
     //MARK:- Variables

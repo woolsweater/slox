@@ -55,27 +55,27 @@ extension Callable
      Create an invokable object from an unpacked `Statement.functionDecl`.
      - remark: In other words, this creates the runtime representation of a function
      defined in the user's source code.
-     - parameter name: The identifier token for the function's name.
+     - parameter name: The identifier for the function.
      - parameter parameters: The list of identifier tokens for the function's parameters.
      May be empty.
      - parameter body: The list of statements contained in the function.
      - parameter environment: The active environment at the time of declaration; this
      allows the function to capture variables from its surrounding scope.
      */
-    static func fromDecl(name: Token,
+    static func fromDecl(name: String,
                    parameters: [Token],
                          body: [Statement],
                   environment: Environment)
         -> Callable
     {
-        return Callable(name: name.lexeme, arity: parameters.count) {
+        return Callable(name: name, arity: parameters.count) {
             (interpreter, arguments) in
-            let environment = Environment(nestedIn: environment)
+            let innerEnvironment = Environment(nestedIn: environment)
             for (parameter, argument) in zip(parameters, arguments) {
-                environment.define(name: parameter.lexeme, value: argument)
+                innerEnvironment.define(name: parameter.lexeme, value: argument)
             }
 
-            do { try interpreter.executeBlock(body, environment: environment) }
+            do { try interpreter.executeBlock(body, environment: innerEnvironment) }
             catch let returnValue as Return {
                 return returnValue.value
             }

@@ -5,7 +5,7 @@ declaration    → funDecl
                | statement ;
 
 funDecl        → "fun" function ;
-function       → IDENTIFIER "(" paramters? ")" block ;
+function       → IDENTIFIER "(" parameters? ")" block ;
 parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
 varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
 
@@ -61,4 +61,6 @@ call           → primary ( "(" arguments? ")" )* ;
 arguments      → expression ( "," expression )* ;
 primary        → NUMBER | STRING | boolean | "nil"
                | "(" expression ")"
+               | anonFunction
                | IDENTIFIER ;
+anonFunction   → "fun" "(" parameters? ")" block ;

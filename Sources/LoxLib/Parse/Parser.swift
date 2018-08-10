@@ -66,6 +66,10 @@ class Parser
     {
         do {
             if self.matchAny(.fun) {
+                guard self.check(.identifier) else {
+                    self.backtrack()
+                    return try self.statement()
+                }
                 return try self.functionDecl("function")
             }
             if self.matchAny(.var) {
@@ -91,7 +95,20 @@ class Parser
     private func functionDecl(_ kind: String) throws -> Statement
     {
         try self.mustConsume(.identifier, message: "Missing name for \(kind).")
-        let name = previous
+        let ident = previous
+
+        let (parameters, body) = try self.finishFunction(kind)
+        return .functionDecl(identifier: ident, parameters: parameters, body: body)
+    }
+
+    private func anonFunction() throws -> Expression
+    {
+        let (parameters, body) = try self.finishFunction("function")
+        return .anonFunction(id: self.index, parameters: parameters, body: body)
+    }
+
+    private func finishFunction(_ kind: String) throws -> ([Token], [Statement])
+    {
         try self.mustConsume(.leftParen, message: "Expected '(' to start parameter list.")
 
         let parameters = try self.parameters()
@@ -103,7 +120,7 @@ class Parser
 
         let body = try self.finishBlock()
 
-        return .functionDecl(name: name, parameters: parameters, body: body)
+        return (parameters, body)
     }
 
     private func parameters() throws -> [Token]
@@ -173,7 +190,7 @@ class Parser
             return try .block(self.finishBlock())
         }
 
-        return try self.finishExpressionStatement()
+        return try self.expressionStatement()
     }
 
     private func finishForStatement() throws -> Statement
@@ -188,7 +205,7 @@ class Parser
             initializer = try self.variableDecl()
         }
         else {
-            initializer = try self.finishExpressionStatement()
+            initializer = try self.expressionStatement()
         }
 
         let condition = self.check(.semicolon) ? .literal(.bool(true)) : try self.expression()
@@ -305,7 +322,7 @@ class Parser
         return statements
     }
 
-    private func finishExpressionStatement() throws -> Statement
+    private func expressionStatement() throws -> Statement
     {
         let expression = try self.expression()
         try self.mustConsume(.semicolon,
@@ -534,6 +551,10 @@ class Parser
             return .variable(self.previous)
         }
 
+        if self.matchAny(.fun) {
+            return try self.anonFunction()
+        }
+
         if self.matchAny(.leftParen) {
             self.parenState++
             defer { self.parenState-- }
@@ -553,7 +574,7 @@ class Parser
     {
         for kind in kinds {
             if self.check(kind) {
-                self.advanceIndex()
+                self.advance()
                 return true
             }
         }
@@ -572,9 +593,14 @@ class Parser
         return self.tokens[self.index]
     }
 
-    private func advanceIndex()
+    private func advance()
     {
         self.index += 1
+    }
+
+    private func backtrack()
+    {
+        self.index -= 1
     }
 
     //MARK:- Error handling
@@ -586,7 +612,7 @@ class Parser
             throw ParseError(message: message)
         }
 
-        self.advanceIndex()
+        self.advance()
     }
 
     private func reportParseError(message: String)
@@ -607,7 +633,7 @@ class Parser
     {
         while !self.isAtEnd {
 
-            self.advanceIndex()
+            self.advance()
 
             // Moved past problematic statement
             if self.previous.kind == .semicolon { return }

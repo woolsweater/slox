@@ -13,6 +13,12 @@ indirect enum Expression : Equatable
      */
     case variable(Token)
     /**
+     A function defined directly as a value, without a name being given. The `id`
+     value uniquely identifies this function among any others defined in the
+     program.
+     */
+    case anonFunction(id: Int, parameters: [Token], body: [Statement])
+    /**
      An expression invoking a function.
      - remark: The closing parenthesis of the arguments list is held for
      error reporting.
@@ -32,7 +38,7 @@ indirect enum Expression : Equatable
 enum Statement : Equatable
 {
     /** A statement declaring a named function. */
-    indirect case functionDecl(name: Token, parameters: [Token], body: [Statement])
+    indirect case functionDecl(identifier: Token, parameters: [Token], body: [Statement])
     /** A statement declaring a variable. An initial value may be provided. */
     case variableDecl(name: Token, initializer: Expression?)
     /** A statment consisting of an expression. */

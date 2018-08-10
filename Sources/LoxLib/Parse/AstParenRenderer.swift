@@ -14,6 +14,8 @@ class AstParenRenderer
         return self.render(self.ast)
     }
 
+    //TODO: This doesn't handle statements at all.
+
     private func render(_ expression: Expression) -> String
     {
         switch expression {
@@ -23,6 +25,8 @@ class AstParenRenderer
                 return self.parenthesize("G", subexpression)
             case let .variable(name):
                 return "${\(name.lexeme)}"
+            case let .anonFunction(id: id, parameters: _, body: _):
+                return self.parenthesize("<fn __unnamedFunc\(id)>")
             case let .call(callee, paren: _, arguments: arguments):
                 return self.renderCall(to: callee, arguments: arguments)
             case let .unary(op: op, subexpression):

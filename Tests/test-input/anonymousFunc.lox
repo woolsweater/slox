@@ -1,0 +1,29 @@
+fun thrice(fn) {
+    for (var i = 0; i < 3; i = i + 1) {
+        fn(i);
+    }
+}
+
+thrice(fun (a) {
+    print a;
+});
+
+fun () {};
+
+var b = fun () {
+    print "Hi!";
+};
+
+b();
+
+var c = fun (a) {
+    return a + 10;
+};
+
+print(c(2));
+
+fun comb (f, g) {
+    f(g);
+}
+
+comb(thrice, fun (n) { print c(n); });
