@@ -1,1 +1,4 @@
 WSS_SWIFT_TESTS_MODULE_NAME = LoxLib
+
+[ source.swift ]
+wrapColumn = 96

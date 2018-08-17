@@ -74,7 +74,7 @@ class LoxScanner
 
     private func addToken(_ kind: Token.Kind, rawLiteral: Any? = nil)
     {
-        let literal = rawLiteral.flatMap(LiteralValue.init)
+        let literal = rawLiteral.flatMap(LiteralValue.init(wrapping:))
         let newToken = Token(kind: kind,
                            lexeme: self.currentLexeme,
                           literal: literal,
@@ -237,3 +237,21 @@ private extension Character
         return CharacterSet.loxIdentifiers.contains(self.unicodeScalars.first!)
     }
 }
+
+private extension LiteralValue
+{
+    /** Wrap a Swift `Double` or `String` into a `LiteralValue` after scanning. */
+    init?(wrapping value: Any)
+    {
+        if let string = value as? String {
+            self = .string(string)
+        }
+        else if let double = value as? Double {
+            self = .double(double)
+        }
+        else {
+            return nil
+        }
+    }
+}
+

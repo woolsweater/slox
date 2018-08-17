@@ -1,39 +1,37 @@
 import Foundation
 
+/** The runtime value of a literal value found in the source code. */
 enum LiteralValue : Equatable
 {
+    /** A number literal. */
     case double(Double)
+    /** A string literal. */
     case string(String)
+    /** A boolean literal. */
     case bool(Bool)
+    /** A literal representing an absent value in the program.  */
     case `nil`
 }
 
-extension LiteralValue
-{
-    init?(value: Any)
-    {
-        if let string = value as? String {
-            self = .string(string)
-        }
-        else if let double = value as? Double {
-            self = .double(double)
-        }
-        else {
-            return nil
-        }
-    }
-}
-
+/** An atomic Lox language entity, produced by scanning Lox source. */
 struct Token : Equatable
 {
+    /** The nature of this `Token`. */
     let kind: Kind
+    /** The raw source text that produced this `Token`. */
     let lexeme: String
+    /** The simple runtime value that the `Token` represents. */
     let literal: LiteralValue?
+    /** The line in the source file on which the `Token` was scanned. */
     let line: Int
 }
 
 extension Token
 {
+    /**
+     The basic role of a `Token`, including specific punctuation, keywords,
+     operators, and so on.
+     */
     enum Kind : Equatable
     {
         // Single-character punctuation
@@ -58,6 +56,10 @@ extension Token
 
 extension Token.Kind
 {
+    /**
+     If the given source string represents a Lox keyword, return the appropriate `Kind`,
+     else `nil`.
+     */
     init?(keyword: String)
     {
         switch keyword {
@@ -88,6 +90,7 @@ extension Token.Kind
 
 extension LiteralValue
 {
+    /** User-facing representation of the literal. */
     var description: String
     {
         switch self {
@@ -101,11 +104,13 @@ extension LiteralValue
 
 extension Token
 {
+    /** A `Token` representing the end of a source file. */
     static func eof(_ line: Int) -> Token
     {
         return Token(kind: .EOF, lexeme: "", literal: nil, line: line)
     }
 
+    /** Printable rendering of the `Token` for debugging. */
     var description: String
     {
         return "\(self.kind) \(self.lexeme) \(self.literal?.description ?? "")"

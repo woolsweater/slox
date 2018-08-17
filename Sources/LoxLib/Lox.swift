@@ -17,7 +17,7 @@ public class Lox
         if let path = args.first {
             self.interpreter = Interpreter(replMode: false)
             do { try self.runFile(path) }
-            catch LoxError.interpretation { return ExitCode.interpreterFailure.returnValue }
+            catch ExecError.interpretation { return ExitCode.interpreterFailure.returnValue }
             catch { return ExitCode.badInput.returnValue }
         }
         else {
@@ -39,7 +39,7 @@ public class Lox
         hasError = true
     }
 
-    private enum LoxError : Error
+    private enum ExecError : Error
     {
         case interpretation
     }
@@ -49,7 +49,7 @@ public class Lox
         let contents = try String(contentsOfFile: path, encoding: .utf8)
         self.run(contents)
         if self.hasError {
-            throw LoxError.interpretation
+            throw ExecError.interpretation
         }
     }
 
