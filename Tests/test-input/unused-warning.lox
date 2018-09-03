@@ -1,0 +1,9 @@
+fun f(dragonfly, axolotl) {    // Warn on axolotl
+    var index = 10;    // Warn on index
+    var message = "Hello, " + dragonfly + "!";
+    print message;
+}
+
+f("bumblebee", 100);
+
+var x = 20;    // There is no warning for globals.

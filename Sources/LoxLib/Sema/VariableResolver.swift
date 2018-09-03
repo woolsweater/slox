@@ -72,26 +72,28 @@ class VariableResolver : SemanticAnalyzer
     private func analyzeBlock(_ statements: [Statement]) throws
     {
         self.beginScope()
-        defer { self.endScope() }
 
         for statement in statements {
             try self.analyze(statement)
         }
+
+        try self.endScope()
     }
 
     private func analyzeFunction(parameters: [Token], body: [Statement]) throws
     {
         self.beginScope()
-        defer { self.endScope() }
 
         for param in parameters {
-            self.declare(variable: param)
+            self.declare(variable: param, isParameter: true)
             self.define(variable: param)
         }
 
         for statement in body {
             try self.analyze(statement)
         }
+
+        try self.endScope()
     }
 
     //MARK:- Expression resolution
@@ -130,6 +132,7 @@ class VariableResolver : SemanticAnalyzer
             if let variable = scope[name.lexeme] {
                 resolution.environmentDistance = steps
                 resolution.index = variable.slot
+                variable.isUnused = false
                 return
             }
         }
@@ -154,11 +157,12 @@ class VariableResolver : SemanticAnalyzer
 
     //MARK:- Scope
 
-    private func declare(variable: Token)
+    private func declare(variable: Token, isParameter: Bool = false)
     {
         guard var currentScope = self.scopes.popLast() else { return }
 
-        currentScope[variable.lexeme] = VariableResolution(slot: currentScope.count)
+        currentScope[variable.lexeme] =
+            VariableResolution(slot: currentScope.count, token: variable, isParameter: isParameter)
         self.scopes.append(currentScope)
     }
 
@@ -175,21 +179,36 @@ class VariableResolver : SemanticAnalyzer
         self.scopes.append([:])
     }
 
-    private func endScope()
+    /**
+     Remove the current scope, checking for variables that were declared here but that
+     have never been referenced. These are reported as warnings.
+     */
+    private func endScope() throws
     {
-        _ = self.scopes.popLast()
+        guard let scope = self.scopes.popLast() else { return }
+        let warnings = scope.values.filter({ $0.isUnused }).map(SemanticWarning.unusedVariable)
+        guard warnings.isEmpty else {
+            throw SemanticBlockWarning(warnings: warnings)
+        }
     }
 }
 
 /** The analyzed state of a declared variable. */
-private struct VariableResolution
+private class VariableResolution
 {
     /**
      Whether the variable's declaration and initialization are complete.
      - remark: Note that this does not mean there was a value explicitly provided, just
      that the analyzer has moved past the variable's declaration without error.
      */
-    var isDefined: Bool = false
+    var isDefined = false
+
+    /**
+     Whether the variable has been accessed in referred to at some point. If not, this
+     is reported as a warning when the analyzer finishes with the scope containing the
+     variable.
+     */
+    var isUnused = true
 
     /**
      The ordinal position of the variable in the scope where it's declared.
@@ -198,9 +217,22 @@ private struct VariableResolution
      */
     let slot: Int
 
-    init(slot: Int)
+    /**
+     The token where the variable was declared. This is used for error reporting.
+     */
+    let token: Token
+
+    /**
+     Whether this is the parameter of a function/method declaration. This is
+     used for error reporting.
+     */
+    let isParameter: Bool
+
+    init(slot: Int, token: Token, isParameter: Bool)
     {
         self.slot = slot
+        self.token = token
+        self.isParameter = isParameter
     }
 }
 
@@ -208,6 +240,18 @@ private extension SemanticError
 {
     static func uninitialized(at token: Token) -> SemanticError
     {
-        return SemanticError(token: token, message: "Variable used in its own initializer")
+        return SemanticError(token: token,
+                           message: "Variable cannot be used in its own initializer")
+    }
+}
+
+private extension SemanticWarning
+{
+    static func unusedVariable(_ variable: VariableResolution) -> SemanticWarning
+    {
+        let message = variable.isParameter ?
+                        "Parameter unused in body" :
+                        "Variable declared but never used"
+        return SemanticWarning(token: variable.token, message: message)
     }
 }

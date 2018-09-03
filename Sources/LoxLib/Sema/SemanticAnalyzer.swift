@@ -26,3 +26,24 @@ struct SemanticError : Error
     /** A user-facing description of the error. */
     let message: String
 }
+
+/**
+ An unexpected condition detected during static analysis that is likely to
+ represent a mistake by the user, but does not prevent program execution.
+ */
+struct SemanticWarning : Error
+{
+    /** The token at which the problem was detected. */
+    let token: Token
+    /** A user-facing string describing the problem. */
+    let message: String
+}
+
+/**
+ A collection of warnings that were all produced by analysis of a single
+ statement.
+ */
+struct SemanticBlockWarning : Error
+{
+    let warnings: [SemanticWarning]
+}

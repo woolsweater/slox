@@ -25,9 +25,18 @@ class AnalysisCoordinator
     {
         for statement in program {
             for analyzer in self.analyzers {
+
                 do { try analyzer.analyze(statement) }
                 catch let error as SemanticError {
                     self.reportSemanticError(error)
+                }
+                catch let blockWarning as SemanticBlockWarning {
+                    for warning in blockWarning.warnings {
+                        self.reportSemanticWarning(warning)
+                    }
+                }
+                catch let warning as SemanticWarning {
+                    self.reportSemanticWarning(warning)
                 }
                 catch {
                     fatalError("Unknown analysis failure: \(error)")
@@ -45,5 +54,14 @@ class AnalysisCoordinator
         Lox.report(at: token.line,
              location: "at \(locationDescription)",
               message: error.message)
+    }
+
+    private func reportSemanticWarning(_ warning: SemanticWarning)
+    {
+        let token = warning.token
+        let locationDescription = token.kind == .EOF ? "end" : "'\(token.lexeme)'"
+        Lox.warn(at: token.line,
+           location: "at \(locationDescription)",
+            message: warning.message)
     }
 }

@@ -33,10 +33,22 @@ public class Lox
         self.hasError = false
     }
 
+    /**
+     Report an error to the user that prevents execution from continuing.
+     */
     static func report(at line: Int, location: String, message: String)
     {
-        print("[line \(line)] Error \(location): \(message)")
+        StdErr.print("[line \(line)] Error \(location): \(message)")
         hasError = true
+    }
+
+    /**
+     Emit a warning to the user. This informs the user of a *likely* mistake in
+     their code, but does not stop analysis or execution.
+     */
+    static func warn(at line: Int, location: String, message: String)
+    {
+        StdErr.print("[line: \(line)] Warning \(location): \(message)")
     }
 
     private enum ExecError : Error
