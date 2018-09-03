@@ -74,11 +74,11 @@ public class Lox
             !(self.hasError)
         else { return }
 
-        let analyzer = Analyzer(analyzers:
+        let coordinator = AnalysisCoordinator(analyzers:
             ControlStatementAnalyzer()
         )
 
-        analyzer.analyze(program)
+        coordinator.analyze(program)
 
         guard !(self.hasError) else { return }
 

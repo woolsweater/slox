@@ -1,20 +1,19 @@
 import Foundation
 
 /**
- Coordinates all `SemanticAnalyzer`s that need to be invoked for the current
+ Routes AST nodes to all `SemanticAnalyzer`s that need to be invoked for the current
  program execution.
- - remark: A `VariableResolver` pass is always included as the last analyzer, as it is required
- by `Interpreter`.
+ - remark: A `VariableResolver` pass is always included as the last analyzer, as
+ it is required by `Interpreter`.
  */
-class Analyzer
+class AnalysisCoordinator
 {
     private let analyzers: [SemanticAnalyzer]
 
     /**
-     Create an `Analyzer` containing the given `SemanticAnalyzer`s.
-     - remark: The analyzers will be run on each statement in the program in the order provided.
-     Each statement will be fully analyzed before moving on to the next one. This gives
-     error-producing analyzers the ability to short-circuit analysis if a major problem is found.
+     Create an `AnalysisCoordinator` containing the given `SemanticAnalyzer`s.
+     - remark: The analyzers will be run, in the order provided, on each statement in
+     the program. Each statement will be fully analyzed before moving on to the next one.
      */
     init(analyzers: SemanticAnalyzer...)
     {
@@ -29,7 +28,6 @@ class Analyzer
                 do { try analyzer.analyze(statement) }
                 catch let error as SemanticError {
                     self.reportSemanticError(error)
-                    return
                 }
                 catch {
                     fatalError("Unknown analysis failure: \(error)")

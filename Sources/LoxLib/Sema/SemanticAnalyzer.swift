@@ -10,7 +10,7 @@ protocol SemanticAnalyzer : AnyObject
     /**
      Examine the given statement, recursing as needed into subcomponents.
      - throws: May throw a `SemanticError`, if necessary, to signal a condition that should
-     prevent further analysis and execution.
+     prevent execution.
      */
     func analyze(_ statement: Statement) throws
 }
