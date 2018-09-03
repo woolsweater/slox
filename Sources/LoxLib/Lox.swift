@@ -71,11 +71,16 @@ public class Lox
         let parser = Parser(tokens: tokens)
         guard
             let program = parser.parse(),
-            !self.hasError else
-        {
-            print("Parsing failed")
-            return
-        }
+            !(self.hasError)
+        else { return }
+
+        let analyzer = Analyzer(analyzers:
+            ControlStatementAnalyzer()
+        )
+
+        analyzer.analyze(program)
+
+        guard !(self.hasError) else { return }
 
         self.interpreter.interpret(program)
     }

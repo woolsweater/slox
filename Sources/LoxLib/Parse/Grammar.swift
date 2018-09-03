@@ -11,7 +11,7 @@ indirect enum Expression : Equatable
      An expression referring to a variable, that evaluates to the variable's
      stored value.
      */
-    case variable(Token)
+    case variable(Token, resolution: ScopeResolution)
     /**
      A function defined directly as a value, without a name being given. The `id`
      value uniquely identifies this function among any others defined in the
@@ -29,7 +29,7 @@ indirect enum Expression : Equatable
     /** An expression with two subexpressions composed with an operator. */
     case binary(left: Expression, op: Token, right: Expression)
     /** An expression binding a new value to a variable. */
-    case assignment(name: Token, value: Expression)
+    case assignment(name: Token, value: Expression, resolution: ScopeResolution)
     /** An expression combining two subexpressions with a logical operator. */
     case logical(left: Expression, op: Token, right: Expression)
 }
@@ -58,7 +58,31 @@ enum Statement : Equatable
      A statement that immediately moves control to the end of the innermost
      enclosing loop.
      */
-    case breakLoop;
+    case breakLoop(Token)
     /** A brace-enclosed series of other statements. */
     indirect case block([Statement])
+}
+
+/**
+ The statically-determined position of the variable to which an assignment or variable
+ expression refers.
+ - remark: This is calculated after parsing, by the `VariableResolver`, and used by
+ the `Interpreter` and its `Environment`s to ensure that variables are not improperly
+ shadowed dynamically.
+ */
+class ScopeResolution
+{
+    /** The number of environments to hop back through for this reference. */
+    var environmentDistance: Int? = nil
+    /** The position of this reference within the scope. */
+    var index: Int? = nil
+}
+
+extension ScopeResolution : Equatable
+{
+    static func == (lhs: ScopeResolution, rhs: ScopeResolution) -> Bool
+    {
+        return lhs.environmentDistance == rhs.environmentDistance &&
+            lhs.index == rhs.index
+    }
 }

@@ -6,13 +6,13 @@ class Interpreter
      Top-level evironment which holds builtins and other internal values,
      such as the REPL's "cut".
      */
-    var globals = Environment()
+    private let globals = GlobalEnvironment()
 
     /**
-     Variable/value pairs in the current scope. Changes as blocks are entered
+     Values of variables in the current scope. Changes as blocks are entered
      and exited.
      */
-    private var environment: Environment!
+    private var environment = Environment()
 
     /**
      Whether the interpreter is running in a REPL instead of interpreting a
@@ -27,8 +27,7 @@ class Interpreter
         if self.isRepl {
             self.globals.createCut()
         }
-        self.globals.defineFunc(Callable.clock)
-        self.environment = globals
+        self.globals.defineBuiltin(Callable.clock)
     }
 
     func interpret(_ program: [Statement]) {
@@ -41,7 +40,7 @@ class Interpreter
             self.reportRuntimeError(error)
         }
         catch {
-            fatalError("Unknown interpretation failure")
+            fatalError("Unknown interpretation failure: \(error)")
         }
     }
 
@@ -83,8 +82,8 @@ class Interpreter
                 return literal.loxValue
             case let .grouping(groupedExpression):
                 return try self.evaluate(groupedExpression)
-            case let .variable(name):
-                return try self.environment.read(variable: name)
+            case let .variable(name, resolution: resolution):
+                return try self.lookUp(variable: name, resolution: resolution)
             case let .anonFunction(id: id, parameters: parameters, body: body):
                 return self.defineFunction(name: "__unnamedFunc\(id)",
                                      parameters: parameters,
@@ -97,8 +96,10 @@ class Interpreter
                 return try self.evaluateBinary(leftExpr: left,
                                                       op: opToken,
                                                rightExpr: right)
-            case let .assignment(name: name, value: value):
-                return try self.evaluateAssignment(name: name, value: value)
+            case let .assignment(name: name, value: value, resolution: resolution):
+                return try self.evaluateAssignment(name: name,
+                                                  value: value,
+                                             resolution: resolution)
             case let .logical(left: left, op: op, right: right):
                 return try self.evaluateLogical(leftExpr: left, op: op, rightExpr: right)
         }
@@ -130,13 +131,24 @@ class Interpreter
     private func evaluateVariableDecl(name: Token, initializer: Expression?) throws
     {
         let value = try initializer.flatMap(self.evaluate)
-        self.environment.define(name: name.lexeme, value: value)
+        self.environment.define(value: value)
     }
 
-    private func evaluateAssignment(name: Token, value: Expression) throws -> LoxValue
+    private func evaluateAssignment(name: Token,
+                                   value: Expression,
+                              resolution: ScopeResolution)
+        throws -> LoxValue
     {
         let evaluated = try self.evaluate(value)
-        try self.environment.assign(variable: name, value: evaluated)
+        if let distance = resolution.environmentDistance, let index = resolution.index {
+            try self.environment.assign(variable: name,
+                                           value: evaluated,
+                                        distance: distance,
+                                           index: index)
+        }
+        else {
+            try self.globals.assign(name: name, value: evaluated)
+        }
 
         return evaluated
     }
@@ -302,6 +314,20 @@ class Interpreter
     }
 
     //MARK:- Helper
+
+    private func lookUp(variable: Token, resolution: ScopeResolution) throws -> LoxValue
+    {
+        if let distance = resolution.environmentDistance, let index = resolution.index {
+            return try self.environment.read(variable: variable, at: distance, index: index)
+        }
+        else if let value = try self.globals.read(name: variable) {
+            return value
+        }
+        else {
+            assertionFailure("Variable '\(variable)' was never resolved and is not a global")
+            throw RuntimeError.unresolvedVariable(variable)
+        }
+    }
 
     private func truthValue(of value: LoxValue) -> Bool
     {

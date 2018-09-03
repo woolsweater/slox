@@ -71,8 +71,8 @@ extension Callable
         return Callable(name: name, arity: parameters.count) {
             (interpreter, arguments) in
             let innerEnvironment = Environment(nestedIn: environment)
-            for (parameter, argument) in zip(parameters, arguments) {
-                innerEnvironment.define(name: parameter.lexeme, value: argument)
+            for argument in arguments {
+                innerEnvironment.define(value: argument)
             }
 
             do { try interpreter.executeBlock(body, environment: innerEnvironment) }

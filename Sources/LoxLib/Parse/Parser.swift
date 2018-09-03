@@ -6,18 +6,6 @@ class Parser
     private var index: Int = 0
 
     /**
-     Track levels of looping so that a `break` statment outside any
-     loop can be reported as an error.
-     */
-    private var loopState = NestingCounter()
-
-    /**
-     Track levels of function declarations so that a `return`
-     statement outside a function can be reported as an error.
-     */
-    private var funcState = NestingCounter()
-
-    /**
      Track levels of parentheses so that commas inside argument lists
      can be parsed correctly.
      */
@@ -115,9 +103,6 @@ class Parser
 
         try self.mustConsume(.leftBrace, message: "Expected '{' to start \(kind) body.")
 
-        self.funcState++
-        defer { self.funcState-- }
-
         let body = try self.finishBlock()
 
         return (parameters, body)
@@ -214,9 +199,6 @@ class Parser
         let increment = self.check(.rightParen) ? nil : try self.expression()
         try self.mustConsume(.rightParen, message: "Expected ')' to terminate 'for' clauses.")
 
-        self.loopState++
-        defer { self.loopState-- }
-
         var body = try self.statement()
         if let increment = increment {
             body = .block([body, .expression(increment)])
@@ -263,10 +245,6 @@ class Parser
 
     private func finishReturnStatement() throws -> Statement
     {
-        if !(self.funcState.isNested) {
-            self.reportParseError(message: "Cannot 'return' outside of a function.")
-        }
-
         let token = self.previous
         let value = self.check(.semicolon) ? nil : try self.expression()
         try self.mustConsume(.semicolon,
@@ -289,9 +267,6 @@ class Parser
         }
         try self.mustConsume(.rightParen, message: parenMessage)
 
-        self.loopState++
-        defer { self.loopState-- }
-
         let body = try self.statement()
 
         return .loop(condition: condition, body: body)
@@ -299,12 +274,10 @@ class Parser
 
     private func finishBreakStatement() throws -> Statement
     {
+        let token = self.previous
         try self.mustConsume(.semicolon, message: "Unterminated 'break' statement.")
-        if !(self.loopState.isNested) {
-            self.reportParseError(message: "Cannot 'break' outside a loop.")
-        }
 
-        return .breakLoop
+        return .breakLoop(token)
     }
 
     private func finishBlock() throws -> [Statement]
@@ -374,14 +347,14 @@ class Parser
         }
 
         // then look*behind* to make sure we have a valid assignment target
-        guard case let .variable(name: name) = lvalue else {
+        guard case let .variable(name, resolution: _) = lvalue else {
             self.reportParseError(message: "Invalid lvalue in assignment")
             return lvalue
         }
 
         let rvalue = try self.assignment()
 
-        return .assignment(name: name, value: rvalue)
+        return .assignment(name: name, value: rvalue, resolution: ScopeResolution())
     }
 
     private func or() throws -> Expression
@@ -548,7 +521,7 @@ class Parser
         }
 
         if self.matchAny(.identifier) {
-            return .variable(self.previous)
+            return .variable(self.previous, resolution: ScopeResolution())
         }
 
         if self.matchAny(.fun) {
