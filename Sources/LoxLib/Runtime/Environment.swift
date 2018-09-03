@@ -31,18 +31,6 @@ class Environment
     }
 
     /**
-     Add a function to the environment.
-     - returns: The added value, for display in a REPL.
-     */
-    @discardableResult
-    func defineFunc(_ callable: Callable) -> LoxValue
-    {
-        let value = LoxValue.callable(callable)
-        self.define(value: value)
-        return value
-    }
-
-    /**
      Look up the value of the given variable, walking back `distance`
      environments and then producing the value at `index` within that
      environment.

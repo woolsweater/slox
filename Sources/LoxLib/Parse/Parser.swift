@@ -83,7 +83,7 @@ class Parser
     private func functionDecl(_ kind: String) throws -> Statement
     {
         try self.mustConsume(.identifier, message: "Missing name for \(kind).")
-        let ident = previous
+        let ident = self.previous
 
         let (parameters, body) = try self.finishFunction(kind)
         return .functionDecl(identifier: ident, parameters: parameters, body: body)

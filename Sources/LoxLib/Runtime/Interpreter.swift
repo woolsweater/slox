@@ -85,9 +85,9 @@ class Interpreter
             case let .variable(name, resolution: resolution):
                 return try self.lookUp(variable: name, resolution: resolution)
             case let .anonFunction(id: id, parameters: parameters, body: body):
-                return self.defineFunction(name: "__unnamedFunc\(id)",
-                                     parameters: parameters,
-                                           body: body)
+                return self.functionValue(name: "__unnamedFunc\(id)",
+                                    parameters: parameters,
+                                          body: body)
             case let .call(callee, paren: paren, arguments: arguments):
                 return try self.evaluateCall(to: callee, passing: arguments, paren: paren)
             case let .unary(op: opToken, operand):
@@ -109,21 +109,20 @@ class Interpreter
 
     private func evaluateFunctionDecl(identifier: Token, parameters: [Token], body: [Statement])
     {
-        self.defineFunction(name: identifier.lexeme, parameters: parameters, body: body)
+        let function = self.functionValue(name: identifier.lexeme,
+                                    parameters: parameters,
+                                          body: body)
+        self.environment.define(value: function)
     }
 
-    /**
-     Add a callable value to the current environment.
-     - returns: The added value, in case we are in the REPL.
-     */
-    @discardableResult
-    private func defineFunction(name: String, parameters: [Token], body: [Statement]) -> LoxValue
+    /** Create a `LoxValue` for a function. */
+    private func functionValue(name: String, parameters: [Token], body: [Statement]) -> LoxValue
     {
         let function = Callable.fromDecl(name: name,
                                    parameters: parameters,
                                          body: body,
                                   environment: self.environment)
-        return self.environment.defineFunc(function)
+        return .callable(function)
     }
 
     //MARK:- Variables
