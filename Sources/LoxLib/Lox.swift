@@ -39,7 +39,7 @@ public class Lox
     static func report(at line: Int, location: String, message: String)
     {
         StdErr.print("[line \(line)] Error \(location): \(message)")
-        hasError = true
+        self.hasError = true
     }
 
     /**

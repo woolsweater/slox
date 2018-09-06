@@ -1,0 +1,15 @@
+var a = 10;
+
+var func = "This is okay";    // No error
+
+func f (n) {    // Error on 'func'; not a keyword
+    for (var i = 0; i < n; i = i + 1) {
+        print "Hello, Lox!";
+    }
+}
+
+f(a);
+
+// var b = func () {    // Error on 'func'; not a keyword
+//     print "Hi!";
+// };

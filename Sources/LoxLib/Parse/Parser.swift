@@ -53,14 +53,18 @@ class Parser
     private func declaration() -> Statement?
     {
         do {
-            if self.matchAny(.fun) {
+            if let production = self.match(.fun, orTypo: .func) {
                 guard self.check(.identifier) else {
+                    // Anonymous function statment expression
                     self.backtrack()
                     return try self.statement()
                 }
-                return try self.functionDecl("function")
+                if case let .error(typo) = production {
+                    self.reportTypo(typo)
+                }
+                return try self.functionDecl(.function)
             }
-            if self.matchAny(.var) {
+            else if self.match(.var) {
                 return try self.variableDecl()
             }
             else {
@@ -80,9 +84,10 @@ class Parser
      Parse a function or method declaration. The `kind` argument describes which,
      for error reporting.
      */
-    private func functionDecl(_ kind: String) throws -> Statement
+    private func functionDecl(_ kind: FuncKind) throws -> Statement
     {
-        try self.mustConsume(.identifier, message: "Missing name for \(kind).")
+        // Never fails because we look ahead in `declaration()` before coming here
+        try! self.mustConsume(.identifier, message: "Missing name for \(kind).")
         let ident = self.previous
 
         let (parameters, body) = try self.finishFunction(kind)
@@ -91,11 +96,11 @@ class Parser
 
     private func anonFunction() throws -> Expression
     {
-        let (parameters, body) = try self.finishFunction("function")
+        let (parameters, body) = try self.finishFunction(.function)
         return .anonFunction(id: self.index, parameters: parameters, body: body)
     }
 
-    private func finishFunction(_ kind: String) throws -> ([Token], [Statement])
+    private func finishFunction(_ kind: FuncKind) throws -> ([Token], [Statement])
     {
         try self.mustConsume(.leftParen, message: "Expected '(' to start parameter list.")
 
@@ -110,13 +115,13 @@ class Parser
 
     private func parameters() throws -> [Token]
     {
-        guard !(self.matchAny(.rightParen)) else { return [] }
+        guard !(self.match(.rightParen)) else { return [] }
 
         var parameters: [Token] = []
         repeat {
             try self.mustConsume(.identifier, message: "Expected parameter name.")
             parameters.append(self.previous)
-        } while self.matchAny(.comma)
+        } while self.match(.comma)
 
         if parameters.count >= Config.maxFunctionArity {
             self.reportParseError(
@@ -137,7 +142,7 @@ class Parser
 
         let name = self.previous
 
-        let initializer = self.matchAny(.equal) ? try self.expression() : nil
+        let initializer = self.match(.equal) ? try self.expression() : nil
 
         try self.mustConsume(.semicolon,
                              message: "Expected ';' after variable declaration.")
@@ -147,31 +152,31 @@ class Parser
 
     private func statement() throws -> Statement
     {
-        if self.matchAny(.for) {
+        if self.match(.for) {
             return try self.finishForStatement()
         }
 
-        if self.matchAny(.if, .unless) {
+        if self.match(.if, .unless) {
             return try self.finishIfStatement()
         }
 
-        if self.matchAny(.print) {
+        if self.match(.print) {
             return try self.finishPrintStatement()
         }
 
-        if self.matchAny(.return) {
+        if self.match(.return) {
             return try self.finishReturnStatement()
         }
 
-        if self.matchAny(.while, .until) {
+        if self.match(.while, .until) {
             return try self.finishLoopStatement()
         }
 
-        if self.matchAny(.break) {
+        if self.match(.break) {
             return try self.finishBreakStatement()
         }
 
-        if self.matchAny(.leftBrace) {
+        if self.match(.leftBrace) {
             return try .block(self.finishBlock())
         }
 
@@ -183,10 +188,10 @@ class Parser
         try self.mustConsume(.leftParen, message: "Expected '(' after 'for'.")
 
         let initializer: Statement?
-        if self.matchAny(.semicolon) {
+        if self.match(.semicolon) {
             initializer = nil
         }
-        else if self.matchAny(.var) {
+        else if self.match(.var) {
             initializer = try self.variableDecl()
         }
         else {
@@ -226,7 +231,7 @@ class Parser
         try self.mustConsume(.rightParen, message: parenMessage)
 
         let thenBranch = try self.statement()
-        let elseBranch = self.matchAny(.else) ? try self.statement() : nil
+        let elseBranch = self.match(.else) ? try self.statement() : nil
 
         if negated && elseBranch != nil {
             self.reportParseError(message: "'unless' cannot have an 'else' clause.")
@@ -310,7 +315,7 @@ class Parser
 
     private func joined() throws -> Expression
     {
-        if self.matchAny(.comma) {
+        if self.match(.comma) {
             self.reportParseError(message: "Missing lefthand expression")
             return try self.joined()
         }
@@ -321,7 +326,7 @@ class Parser
             return expr
         }
 
-        while self.matchAny(.comma) {
+        while self.match(.comma) {
             let op = self.previous
             let right = try self.assignment()
             expr = .binary(left: expr, op: op, right: right)
@@ -332,7 +337,7 @@ class Parser
 
     private func assignment() throws -> Expression
     {
-        if self.matchAny(.equal) {
+        if self.match(.equal) {
             self.reportParseError(message: "Missing lefthand expression")
             return try self.assignment()
         }
@@ -342,7 +347,7 @@ class Parser
         // side first...
         let lvalue = try self.or()
 
-        guard self.matchAny(.equal) else {
+        guard self.match(.equal) else {
             return lvalue
         }
 
@@ -359,14 +364,14 @@ class Parser
 
     private func or() throws -> Expression
     {
-        if self.matchAny(.or) {
+        if self.match(.or) {
             self.reportParseError(message: "Missing lefthand expression.")
             return try self.or()
         }
 
         var expr = try self.and()
 
-        while self.matchAny(.or) {
+        while self.match(.or) {
             let op = self.previous
             let right = try self.and()
             expr = .logical(left: expr, op: op, right: right)
@@ -377,14 +382,14 @@ class Parser
 
     private func and() throws -> Expression
     {
-        if self.matchAny(.and) {
+        if self.match(.and) {
             self.reportParseError(message: "Missing lefthand expression.")
             return try self.and()
         }
 
         var expr = try self.equality()
 
-        while self.matchAny(.and) {
+        while self.match(.and) {
             let op = self.previous
             let right = try self.equality()
             expr = .logical(left: expr, op: op, right: right)
@@ -395,14 +400,14 @@ class Parser
 
     private func equality() throws -> Expression
     {
-        if self.matchAny(.bangEqual, .equalEqual) {
+        if self.match(.bangEqual, .equalEqual) {
             self.reportParseError(message: "Missing lefthand expression")
             return try self.equality()
         }
 
         var expr = try self.comparison()
 
-        while self.matchAny(.bangEqual, .equalEqual) {
+        while self.match(.bangEqual, .equalEqual) {
             let op = self.previous
             let right = try self.comparison()
             expr = .binary(left: expr, op: op, right: right)
@@ -413,14 +418,14 @@ class Parser
 
     private func comparison() throws -> Expression
     {
-        if self.matchAny(.greater, .greaterEqual, .less, .lessEqual) {
+        if self.match(.greater, .greaterEqual, .less, .lessEqual) {
             self.reportParseError(message: "Missing lefthand expression")
             return try self.comparison()
         }
 
         var expr = try self.addition()
 
-        while self.matchAny(.greater, .greaterEqual, .less, .lessEqual) {
+        while self.match(.greater, .greaterEqual, .less, .lessEqual) {
             let op = self.previous
             let right = try self.addition()
             expr = .binary(left: expr, op: op, right: right)
@@ -431,14 +436,14 @@ class Parser
 
     private func addition() throws -> Expression
     {
-        if self.matchAny(.plus) {
+        if self.match(.plus) {
             self.reportParseError(message: "Missing lefthand expression")
             return try self.addition()
         }
 
         var expr = try self.multiplication()
 
-        while self.matchAny(.minus, .plus) {
+        while self.match(.minus, .plus) {
             let op = self.previous
             let right = try self.multiplication()
             expr = .binary(left: expr, op: op, right: right)
@@ -451,7 +456,7 @@ class Parser
     {
         var expr = try self.unary()
 
-        while self.matchAny(.slash, .star) {
+        while self.match(.slash, .star) {
             let op = self.previous
             let right = try self.unary()
             expr = .binary(left: expr, op: op, right: right)
@@ -462,7 +467,7 @@ class Parser
 
     private func unary() throws -> Expression
     {
-        guard self.matchAny(.bang, .minus) else {
+        guard self.match(.bang, .minus) else {
             return try self.call()
         }
 
@@ -477,7 +482,7 @@ class Parser
 
         //TODO: This loop will make more sense when dot expressions are added
         while true {
-            guard self.matchAny(.leftParen) else { break }
+            guard self.match(.leftParen) else { break }
             expr = try self.finishCall(to: expr)
         }
 
@@ -495,7 +500,7 @@ class Parser
 
             repeat {
                 arguments.append(try self.expression())
-            } while self.matchAny(.comma)
+            } while self.match(.comma)
         }
 
         if arguments.count > Config.maxFunctionArity {
@@ -512,23 +517,26 @@ class Parser
 
     private func primary() throws -> Expression
     {
-        if self.matchAny(.false) { return .literal(.bool(false)) }
-        if self.matchAny(.true) { return .literal(.bool(true)) }
-        if self.matchAny(.nil) { return .literal(.nil) }
+        if self.match(.false) { return .literal(.bool(false)) }
+        if self.match(.true) { return .literal(.bool(true)) }
+        if self.match(.nil) { return .literal(.nil) }
 
-        if self.matchAny(.number, .string) {
+        if self.match(.number, .string) {
             return .literal(self.previous.literal!)
         }
 
-        if self.matchAny(.identifier) {
-            return .variable(self.previous, resolution: ScopeResolution())
-        }
-
-        if self.matchAny(.fun) {
+        if let production = self.match(.fun, orTypo: .func) {
+            if case let .error(typo) = production {
+                self.reportTypo(typo)
+            }
             return try self.anonFunction()
         }
 
-        if self.matchAny(.leftParen) {
+        if self.match(.identifier) {
+            return .variable(self.previous, resolution: ScopeResolution())
+        }
+
+        if self.match(.leftParen) {
             self.parenState++
             defer { self.parenState-- }
 
@@ -543,7 +551,7 @@ class Parser
 
     //MARK:- Utility
 
-    private func matchAny(_ kinds: Token.Kind...) -> Bool
+    private func match(_ kinds: Token.Kind...) -> Bool
     {
         for kind in kinds {
             if self.check(kind) {
@@ -555,6 +563,56 @@ class Parser
         return false
     }
 
+    /**
+     The result of checking for a valid token or a related typo that can each
+     occur at the the same point in the parse tree.
+     */
+    private enum Production
+    {
+        /** The expected token type was found. */
+        case correct
+        /**
+         The related typo was found. It is embedded for ease of error reporting.
+         */
+        case error(Typo)
+    }
+
+    /**
+     Test first for an expected `Token.Kind`, then for a related error.
+     - returns: The result of comparing the current token, or `nil` if
+     neither the `Token.Kind` nor the `Typo` matched.
+     */
+    private func match(_ token: Token.Kind, orTypo typo: Typo) -> Production?
+    {
+        if self.match(token) {
+            return .correct
+        }
+        else if self.matchTypo(typo) {
+            return .error(typo)
+        }
+        else {
+            return nil
+        }
+    }
+
+    /** Consume the current token if it matches the given mistake. */
+    private func matchTypo(_ typo: Typo) -> Bool
+    {
+        guard !(self.isAtEnd) else { return false }
+
+        let token = self.peek()
+        guard token.kind == .identifier && token.lexeme == typo.lexeme else {
+            return false
+        }
+
+        self.advance()
+        return true
+    }
+
+    /**
+     Test that the current token is of the given `Kind`.
+     - parameter kind: The kind of token to match.
+     */
     private func check(_ kind: Token.Kind) -> Bool
     {
         guard !(self.isAtEnd) else { return false }
@@ -597,6 +655,11 @@ class Parser
               message: message)
     }
 
+    private func reportTypo(_ typo: Typo)
+    {
+        self.reportParseError(message: typo.message)
+    }
+
     /**
      Step forward through a statement that has failed to parse, resuming when
      the parsing is likely to begin at a new statement, so that we can
@@ -630,5 +693,13 @@ class Parser
     private struct ParseError : Error
     {
         let message: String
+    }
+
+    private enum FuncKind : String, CustomStringConvertible
+    {
+        /** A free function. */
+        case function
+
+        var description: String { return self.rawValue }
     }
 }
