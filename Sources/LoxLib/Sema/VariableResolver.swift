@@ -41,26 +41,42 @@ class VariableResolver : SemanticAnalyzer
 
     private func analyzeClassDecl(name: Token, methods: [Statement]) throws
     {
-        self.declare(variable: name)
-        //TODO: Methods
-        self.define(variable: name)
+        try self.declare(name: name)
+        self.define(name: name)
+
+        var uniqueMethodNames: Set<String> = []
+        for decl in methods.map(self.unpackMethodDecl) {
+            guard case (true, _) = uniqueMethodNames.insert(decl.identifier.lexeme) else {
+                throw SemanticError.redefinition(at: decl.identifier)
+            }
+            try self.analyzeFunction(parameters: decl.parameters, body: decl.body)
+        }
+    }
+
+    private func unpackMethodDecl(_ statement: Statement) -> (identifier: Token, parameters: [Token], body: [Statement])
+    {
+        guard case let
+            .functionDecl(identifier: identifier, parameters: parameters, body: body) = statement
+        else { fatalError("Non-method '\(statement)' in class method list") }
+
+        return (identifier: identifier, parameters: parameters, body: body)
     }
 
     private func analyzeFunctionDecl(_ identifier: Token, parameters: [Token], body: [Statement]) throws
     {
-        self.declare(variable: identifier)
-        self.define(variable: identifier)
+        try self.declare(name: identifier)
+        self.define(name: identifier)
 
         try self.analyzeFunction(parameters: parameters, body: body)
     }
 
     private func analyzeVariableDecl(_ name: Token, initializer: Expression?) throws
     {
-        self.declare(variable: name)
+        try self.declare(name: name)
         if let initializer = initializer {
             try self.analyze(initializer)
         }
-        self.define(variable: name)
+        self.define(name: name)
     }
 
     private func analyzeConditional(_ condition: Expression, then: Statement, else: Statement?) throws
@@ -94,8 +110,8 @@ class VariableResolver : SemanticAnalyzer
         self.beginScope()
 
         for param in parameters {
-            self.declare(variable: param, isParameter: true)
-            self.define(variable: param)
+            try self.declare(name: param, isParameter: true)
+            self.define(name: param)
         }
 
         for statement in body {
@@ -171,20 +187,23 @@ class VariableResolver : SemanticAnalyzer
 
     //MARK:- Scope
 
-    private func declare(variable: Token, isParameter: Bool = false)
+    private func declare(name: Token, isParameter: Bool = false) throws
     {
         guard var currentScope = self.scopes.popLast() else { return }
+        guard !(currentScope.keys.contains(name.lexeme)) else {
+            throw SemanticError.redefinition(at: name)
+        }
 
-        currentScope[variable.lexeme] =
-            VariableResolution(slot: currentScope.count, token: variable, isParameter: isParameter)
+        currentScope[name.lexeme] =
+            VariableResolution(slot: currentScope.count, token: name, isParameter: isParameter)
         self.scopes.append(currentScope)
     }
 
-    private func define(variable: Token)
+    private func define(name: Token)
     {
         guard var currentScope = self.scopes.popLast() else { return }
 
-        currentScope[variable.lexeme]!.isDefined = true
+        currentScope[name.lexeme]!.isDefined = true
         self.scopes.append(currentScope)
     }
 
@@ -256,6 +275,12 @@ private extension SemanticError
     {
         return SemanticError(token: token,
                            message: "Variable cannot be used in its own initializer")
+    }
+
+    static func redefinition(at token: Token) -> SemanticError
+    {
+        return SemanticError(token: token,
+                           message: "Redefinition of name '\(token.lexeme)'")
     }
 }
 

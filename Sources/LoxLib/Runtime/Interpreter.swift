@@ -87,9 +87,10 @@ class Interpreter
             case let .variable(name, resolution: resolution):
                 return try self.lookUp(variable: name, resolution: resolution)
             case let .anonFunction(id: id, parameters: parameters, body: body):
-                return self.functionValue(name: "__unnamedFunc\(id)",
-                                    parameters: parameters,
-                                          body: body)
+                let function = self.callableFunction(name: "__unnamedFunc\(id)",
+                                               parameters: parameters,
+                                                     body: body)
+                return .callable(function)
             case let .call(callee, paren: paren, arguments: arguments):
                 return try self.evaluateCall(to: callee, passing: arguments, paren: paren)
             case let .get(object: object, member: member):
@@ -115,28 +116,44 @@ class Interpreter
 
     private func evaluateClassDecl(name: Token, methods: [Statement])
     {
-        let classValue = LoxValue.class(LoxClass(name: name.lexeme))
-        self.environment.define(value: classValue)
+       let methodMap =
+           // Uniqueness of method names checked by VariableResolver
+           Dictionary(uniqueKeysWithValues: methods.map(self.funcStatementToMethod))
+
+        let klass = LoxClass(name: name.lexeme, methods: methodMap)
+
+        self.environment.define(value: .class(klass))
+    }
+
+    private func funcStatementToMethod(_ statement: Statement) -> (String, Callable)
+    {
+        guard case let
+            .functionDecl(identifier: identifier, parameters: parameters, body: body) = statement
+        else { fatalError("Non-method '\(statement)' in class decl method list") }
+
+        let methodName = identifier.lexeme
+        let callable = self.callableFunction(name: methodName, parameters: parameters, body: body)
+        return (methodName, callable)
     }
 
     //MARK:- Function definition
 
     private func evaluateFunctionDecl(identifier: Token, parameters: [Token], body: [Statement])
     {
-        let function = self.functionValue(name: identifier.lexeme,
-                                    parameters: parameters,
-                                          body: body)
-        self.environment.define(value: function)
+        let function = self.callableFunction(name: identifier.lexeme,
+                                       parameters: parameters,
+                                             body: body)
+        self.environment.define(value: .callable(function))
     }
 
-    /** Create a `LoxValue` for a function. */
-    private func functionValue(name: String, parameters: [Token], body: [Statement]) -> LoxValue
+    /** Create a `Callable` for a function or method. */
+    private func callableFunction(name: String, parameters: [Token], body: [Statement]) -> Callable
     {
         let function = Callable.fromDecl(name: name,
                                    parameters: parameters,
                                          body: body,
                                   environment: self.environment)
-        return .callable(function)
+        return function
     }
 
     //MARK:- Variables

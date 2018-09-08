@@ -3,8 +3,9 @@ import Foundation
 /** Runtime representation of an instance of a Lox class. */
 class LoxInstance
 {
-    /** The Lox class of which this instance is a member. */
+    /** The Lox class of which this is an instance. */
     private let klass: LoxClass
+
     /**
      Values that have been stored on this instance by name.
      - remark: Since properties are freely addable to instances,
@@ -23,17 +24,22 @@ class LoxInstance
     /**
      Access a member by name.
      - throws: A `RuntimeError` if the name has not been assigned a
-     value on this instance.
+     value on this instance (as either a property or a method).
      - returns: The result of looking up the name in this instance's
      stored values.
      */
     func get(_ member: Token) throws -> LoxValue
     {
-        guard let value = self.fields[member.lexeme] else {
+        let name = member.lexeme
+        if let value = self.fields[name] {
+            return value
+        }
+        else if let method = self.klass.instanceMethod(named: name){
+            return .callable(method)
+        }
+        else {
             throw RuntimeError.unrecognizedMember(member)
         }
-
-        return value
     }
 
     /**

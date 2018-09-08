@@ -3,12 +3,17 @@ import Foundation
 /** Runtime representation of a class in a Lox program. */
 class LoxClass
 {
+    /** The class's identifier in the interpreted source. */
     let name: String
 
-    /** Create a class with the given name. */
-    init(name: String)
+    /** Instance methods declared on this class. */
+    private let methods: [String : Callable]
+
+    /** Create a class with the given name and method list. */
+    init(name: String, methods: [String : Callable])
     {
         self.name = name
+        self.methods = methods
     }
 
     /**
@@ -28,6 +33,15 @@ class LoxClass
         let instance = LoxInstance(klass: self)
         //TODO: Use initializer if present
         return instance
+    }
+
+    /**
+     Look up a the given name in the class's instance method table, returning
+     the corresponding `Callable` if present.
+     */
+    func instanceMethod(named name: String) -> Callable?
+    {
+        return self.methods[name]
     }
 }
 
