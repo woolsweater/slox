@@ -66,7 +66,7 @@ class Environment
 
     /**
      Bind the variable at the given indexes to the new value. The variable must exist
-     in one of the scope reachable from this one.
+     in one of the scopes reachable from this one.
      - throws: A `RuntimeError` if the (`distance`, `index`) pair does not lead to
      an existing slot in a reachable scope. This means that the variable is not
      defined.

@@ -40,7 +40,7 @@ extension RuntimeError
     /** The `callee` of a `.call` expression did not evaluate to an invokable value. */
     static func notCallable(at token: Token) -> RuntimeError
     {
-        return RuntimeError(token: token, message: "Can only invoke functions and classes")
+        return RuntimeError(token: token, message: "Can only invoke functions/methods and classes")
     }
 
     /** The parameter count of an invoked function did not match the number of arguments. */
@@ -57,6 +57,20 @@ extension RuntimeError
     static func unresolvedVariable(_ variable: Token) -> RuntimeError
     {
         return RuntimeError(token: variable,
-                            message: "Variable '\(variable.lexeme)' could not be resolved")
+                          message: "Variable '\(variable.lexeme)' could not be resolved")
+    }
+
+    /** The object of a member access expression (get or set) was not a Lox object. */
+    static func notAnObject(at token: Token) -> RuntimeError
+    {
+        return RuntimeError(token: token,
+                          message: "Target of member access is not an object")
+    }
+
+    /** The name given in a member access was not found on the object. */
+    static func unrecognizedMember(_ token: Token) -> RuntimeError
+    {
+        return RuntimeError(token: token,
+                          message: "No member named \(token.lexeme)")
     }
 }

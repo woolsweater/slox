@@ -14,6 +14,10 @@ enum LoxValue : Equatable
     case bool(Bool)
     /** A value that can be invoked like a function. */
     case callable(Callable)
+    /** A Lox class object. */
+    case `class`(LoxClass)
+    /** An instance of a Lox class.  */
+    case instance(LoxInstance)
     /**
      The absence of any other value.
      - remark: This is distinct from an *uninitialized*

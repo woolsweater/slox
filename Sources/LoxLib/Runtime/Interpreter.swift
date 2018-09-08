@@ -47,6 +47,8 @@ class Interpreter
     private func execute(_ statement: Statement) throws
     {
         switch statement {
+            case let .classDecl(name: name, methods: methods):
+                self.evaluateClassDecl(name: name, methods: methods)
             case let .functionDecl(identifier: ident, parameters: parameters, body: body):
                 self.evaluateFunctionDecl(identifier: ident, parameters: parameters, body: body)
             case let .variableDecl(name: name, initializer: expression):
@@ -90,6 +92,10 @@ class Interpreter
                                           body: body)
             case let .call(callee, paren: paren, arguments: arguments):
                 return try self.evaluateCall(to: callee, passing: arguments, paren: paren)
+            case let .get(object: object, member: member):
+                return try self.evaluateGet(object: object, member: member)
+            case let .set(object: object, member: member, value: value):
+                return try self.evaluateSet(object: object, member: member, value: value)
             case let .unary(op: opToken, operand):
                 return try self.evaluateUnary(op: opToken, operand)
             case let .binary(left: left, op: opToken, right: right):
@@ -103,6 +109,14 @@ class Interpreter
             case let .logical(left: left, op: op, right: right):
                 return try self.evaluateLogical(leftExpr: left, op: op, rightExpr: right)
         }
+    }
+
+    //MARK:- Class declaration
+
+    private func evaluateClassDecl(name: Token, methods: [Statement])
+    {
+        let classValue = LoxValue.class(LoxClass(name: name.lexeme))
+        self.environment.define(value: classValue)
     }
 
     //MARK:- Function definition
@@ -211,19 +225,46 @@ class Interpreter
     //MARK:- Function invocation
 
     private func evaluateCall(to calleeExpr: Expression,
-                              passing argExprs: [Expression],
-                              paren: Token)
+                           passing argExprs: [Expression],
+                                      paren: Token)
         throws -> LoxValue
     {
         let callee = try self.evaluate(calleeExpr)
 
         let arguments = try argExprs.map({ try self.evaluate($0) })
 
-        guard case let .callable(function) = callee else {
+        if case let .callable(callable) = callee {
+            return try callable.invoke(using: self, at: paren, arguments: arguments)
+        }
+        else if case let .class(klass) = callee {
+            return try .instance(klass.allocInit(using: self, arguments: arguments))
+        }
+        else {
             throw RuntimeError.notCallable(at: paren)
         }
+    }
 
-        return try function.invoke(using: self, at: paren, arguments: arguments)
+    //MARK:- Member access
+
+    private func evaluateGet(object: Expression, member: Token) throws -> LoxValue
+    {
+        guard case let .instance(instance) = try self.evaluate(object) else {
+            throw RuntimeError.notAnObject(at: member)
+        }
+
+        return try instance.get(member)
+    }
+
+    private func evaluateSet(object: Expression, member: Token, value: Expression) throws -> LoxValue
+    {
+        guard case let .instance(instance) = try self.evaluate(object) else {
+            throw RuntimeError.notAnObject(at: member)
+        }
+
+        let value = try self.evaluate(value)
+
+        instance.set(member, to: value)
+        return value
     }
 
     //MARK:- Unary
@@ -351,6 +392,10 @@ class Interpreter
                 return String(describing: bool)
             case let .callable(function):
                 return String(describing: function)
+            case let .class(klass):
+                return "<class \(klass.name)>"
+            case let .instance(instance):
+                return "<\(instance)>"
             case .nil:
                 return "nil"
         }

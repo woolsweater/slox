@@ -16,6 +16,8 @@ class VariableResolver : SemanticAnalyzer
     func analyze(_ statement: Statement) throws
     {
         switch statement {
+            case let .classDecl(name: name, methods: methods):
+                try self.analyzeClassDecl(name: name, methods: methods)
             case let .functionDecl(identifier: identifier, parameters: parameters, body: body):
                 try self.analyzeFunctionDecl(identifier, parameters: parameters, body: body)
             case let .variableDecl(name: name, initializer: initializer):
@@ -35,6 +37,13 @@ class VariableResolver : SemanticAnalyzer
             case let .block(statements):
                 try self.analyzeBlock(statements)
         }
+    }
+
+    private func analyzeClassDecl(name: Token, methods: [Statement]) throws
+    {
+        self.declare(variable: name)
+        //TODO: Methods
+        self.define(variable: name)
     }
 
     private func analyzeFunctionDecl(_ identifier: Token, parameters: [Token], body: [Statement]) throws
@@ -111,6 +120,11 @@ class VariableResolver : SemanticAnalyzer
                 try self.analyzeFunction(parameters: parameters, body: body)
             case let .call(callee, paren: _, arguments: arguments):
                 try self.analyzeCall(callee, arguments: arguments)
+            case let .get(object: object, member: _):
+                try self.analyze(object)
+            case let .set(object: object, member: _, value: value):
+                try self.analyze(object)
+                try self.analyze(value)
             case let .unary(op: _, operand):
                 try self.analyze(operand)
             case let .binary(left: left, op: _, right: right),

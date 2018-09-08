@@ -53,7 +53,10 @@ class Parser
     private func declaration() -> Statement?
     {
         do {
-            if let production = self.match(.fun, orTypo: .func) {
+            if self.match(.class) {
+                return try self.classDecl()
+            }
+            else if let production = self.match(.fun, orTypo: .func) {
                 guard self.check(.identifier) else {
                     // Anonymous function statment expression
                     self.backtrack()
@@ -80,14 +83,29 @@ class Parser
         }
     }
 
+    private func classDecl() throws -> Statement
+    {
+        try self.mustConsume(.identifier, message: "Missing class name")
+        let name = self.previous
+        try self.mustConsume(.leftBrace, message: "Expected '{' to begin class body")
+
+        var methods: [Statement] = []
+        while !(self.check(.rightBrace)) && !(self.isAtEnd) {
+            methods.append(try self.functionDecl(.method))
+        }
+
+        try self.mustConsume(.rightBrace, message: "Expected '}' to close class body")
+
+        return .classDecl(name: name, methods: methods)
+    }
+
     /**
      Parse a function or method declaration. The `kind` argument describes which,
      for error reporting.
      */
     private func functionDecl(_ kind: FuncKind) throws -> Statement
     {
-        // Never fails because we look ahead in `declaration()` before coming here
-        try! self.mustConsume(.identifier, message: "Missing name for \(kind).")
+        try self.mustConsume(.identifier, message: "Missing name for \(kind).")
         let ident = self.previous
 
         let (parameters, body) = try self.finishFunction(kind)
@@ -352,14 +370,18 @@ class Parser
         }
 
         // then look*behind* to make sure we have a valid assignment target
-        guard case let .variable(name, resolution: _) = lvalue else {
+        if case let .variable(name, resolution: _) = lvalue {
+            let rvalue = try self.assignment()
+            return .assignment(name: name, value: rvalue, resolution: ScopeResolution())
+        }
+        else if case let .get(object: object, member: member) = lvalue {
+            let rvalue = try self.assignment()
+            return .set(object: object, member: member, value: rvalue)
+        }
+        else {
             self.reportParseError(message: "Invalid lvalue in assignment")
             return lvalue
         }
-
-        let rvalue = try self.assignment()
-
-        return .assignment(name: name, value: rvalue, resolution: ScopeResolution())
     }
 
     private func or() throws -> Expression
@@ -480,10 +502,18 @@ class Parser
     {
         var expr = try self.primary()
 
-        //TODO: This loop will make more sense when dot expressions are added
         while true {
-            guard self.match(.leftParen) else { break }
-            expr = try self.finishCall(to: expr)
+            if self.match(.leftParen) {
+                expr = try self.finishCall(to: expr)
+            }
+            else if self.match(.dot) {
+                try self.mustConsume(.identifier,
+                                     message: "Expected member name after '.'")
+                expr = .get(object: expr, member: self.previous)
+            }
+            else {
+                break
+            }
         }
 
         return expr
@@ -699,6 +729,9 @@ class Parser
     {
         /** A free function. */
         case function
+
+        /** A method on a class. */
+        case method
 
         var description: String { return self.rawValue }
     }

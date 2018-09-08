@@ -24,6 +24,10 @@ indirect enum Expression : Equatable
      error reporting.
      */
     case call(Expression, paren: Token, arguments: [Expression])
+    /** An expression accessing a member of an object. */
+    case get(object: Expression, member: Token)
+    /** An expression assigning a value to a member of an object. */
+    case set(object: Expression, member: Token, value: Expression)
     /** An expression of a unary operator applied to another expresssion. */
     case unary(op: Token, Expression)
     /** An expression with two subexpressions composed with an operator. */
@@ -37,6 +41,11 @@ indirect enum Expression : Equatable
 /** An element of Lox grammar that produces an effect. */
 enum Statement : Equatable
 {
+    /**
+     A declaration of a class. The `methods` list is the `.functionDecl`s contained
+     in the class body.
+     */
+    indirect case classDecl(name: Token, methods: [Statement])
     /** A statement declaring a named function. */
     indirect case functionDecl(identifier: Token, parameters: [Token], body: [Statement])
     /** A statement declaring a variable. An initial value may be provided. */
