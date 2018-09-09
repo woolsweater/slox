@@ -14,24 +14,27 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
     private var loopState = NestingCounter()
 
     /**
-     Track class nesting so that a `this` reference outside a class
-     can be reported as an error.
+     Track class nesting so that a `this` reference outside a class can be
+     reported as an error.
      */
     private var classState = NestingCounter()
 
     /**
-     Track levels of function declarations so that a `return`
-     statement outside a function can be reported as an error.
+     Track kinds of function declarations so illegal `return` statements can
+     be reported as errors.
+     - remark: We check for simple usage of `return` outside any kind of function.
+     we also flag a return statement with a value as an error inside of a class
+     initializer.
      */
-    private var funcState = NestingCounter()
+    private var funcState = StateTracker<FuncKind>()
 
     func analyze(_ statement: Statement) throws
     {
         switch statement {
             case let .classDecl(name: _, methods: methods):
                 try self.analyzeClass(methods: methods)
-            case let .functionDecl(identifier: _, parameters: _, body: body):
-                try self.analyzeFunction(body)
+            case let .functionDecl(identifier: name, parameters: _, body: body):
+                try self.analyzeFunction(name: name, body: body)
             case let .variableDecl(name: _, initializer: initalizer):
                 // Declaration with '.this' as name is caught by the Parser
                 try initalizer.flatMap(self.analyze)
@@ -43,8 +46,8 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
                 try elseBranch.flatMap(self.analyze)
             case let .print(expression):
                 try self.analyze(expression)
-            case let .return(token, value: _):
-                try self.analyzeReturn(at: token)
+            case let .return(token, value: value):
+                try self.analyzeReturn(at: token, value: value)
             case let .loop(condition: condition, body: body):
                 try self.analyze(condition)
                 try self.analyze(body)
@@ -69,9 +72,14 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
         }
     }
 
-    private func analyzeFunction(_ body: [Statement]) throws
+    private func analyzeFunction(name: Token, body: [Statement]) throws
     {
-        self.funcState++
+        let state: FuncKind =
+            self.classState.isNested
+                ? (name.lexeme == LoxClass.initializerName) ? .initializer : .method
+                : .function
+
+        self.funcState += state
         defer { self.funcState-- }
 
         for statement in body {
@@ -79,10 +87,16 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
         }
     }
 
-    private func analyzeReturn(at token: Token) throws
+    private func analyzeReturn(at token: Token, value: Expression?) throws
     {
         guard self.funcState.isNested else {
             throw SemanticError.misplacedReturn(at: token)
+        }
+
+        if self.funcState.current == .initializer {
+            guard value == nil else {
+                throw SemanticError.initReturningValue(at: token)
+            }
         }
     }
 
@@ -107,7 +121,7 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
 
     private func analyzeInstanceRef(_ keyword: Token) throws
     {
-        guard self.classState.isNested && self.funcState.isNested else {
+        guard self.funcState.current ~ [.method, .initializer] else {
             throw SemanticError.misplacedObjectRef(at: keyword)
         }
     }
@@ -128,5 +142,10 @@ private extension SemanticError
     static func misplacedObjectRef(at token: Token) -> SemanticError
     {
         return SemanticError(token: token, message: "Cannot use '\(token.lexeme)' outside a method")
+    }
+
+    static func initReturningValue(at token: Token) -> SemanticError
+    {
+        return SemanticError(token: token, message: "Cannot return a value from 'init'")
     }
 }

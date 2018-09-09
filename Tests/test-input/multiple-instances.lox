@@ -24,7 +24,7 @@ exterminateWhales();    // Prints "Exterminate humpback whales!"
 // Assigning methods to properties
 
 class Person {
-    sayName() {
+    sayName () {
         print this.name;
     }
 }

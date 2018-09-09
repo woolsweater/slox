@@ -741,15 +741,4 @@ class Parser
     {
         let message: String
     }
-
-    private enum FuncKind : String, CustomStringConvertible
-    {
-        /** A free function. */
-        case function
-
-        /** A method on a class. */
-        case method
-
-        var description: String { return self.rawValue }
-    }
 }
