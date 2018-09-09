@@ -1,0 +1,10 @@
+// fun notAMethod (this) {}    // Error: cannot use 'this' as indentifier
+
+// var this = 10;    // Error: cannot use 'this' as indentifier
+
+// print this;    // Error: cannot use 'this' outside a method
+
+fun stillNotAMethod () {
+    var a = this;    // Error: cannot use 'this' outside a method
+    print a;
+}

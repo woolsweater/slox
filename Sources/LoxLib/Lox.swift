@@ -87,7 +87,7 @@ public class Lox
         else { return }
 
         let coordinator = AnalysisCoordinator(analyzers:
-            ControlStatementAnalyzer()
+            KeywordPlacementAnalyzer()
         )
 
         coordinator.analyze(program)

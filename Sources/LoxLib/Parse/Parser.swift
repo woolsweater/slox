@@ -137,7 +137,12 @@ class Parser
 
         var parameters: [Token] = []
         repeat {
-            try self.mustConsume(.identifier, message: "Expected parameter name.")
+            if self.match(.this, .super) {
+                self.reportIllegalObjectRef()
+            }
+            else {
+                try self.mustConsume(.identifier, message: "Expected parameter name.")
+            }
             parameters.append(self.previous)
         } while self.match(.comma)
 
@@ -155,8 +160,13 @@ class Parser
 
     private func variableDecl() throws -> Statement
     {
-        try self.mustConsume(.identifier,
-                             message: "Expected an identifier in variable declaration.")
+        if self.match(.this, .super) {
+            self.reportIllegalObjectRef()
+        }
+        else {
+            try self.mustConsume(.identifier,
+                                 message: "Expected an identifier in variable declaration.")
+        }
 
         let name = self.previous
 
@@ -677,13 +687,19 @@ class Parser
         self.advance()
     }
 
-    private func reportParseError(message: String)
+    private func reportParseError(at token: Token? = nil, message: String)
     {
-        let token = self.peek()
+        let token = token ?? self.peek()
         let locationDescription = token.kind == .EOF ? "end" : "'\(token.lexeme)'"
         Lox.report(at: token.line,
              location: "at \(locationDescription)",
               message: message)
+    }
+
+    private func reportIllegalObjectRef()
+    {
+        let message = "Cannot use keyword '\(self.previous.lexeme)' as an identifier"
+        self.reportParseError(at: self.previous, message: message)
     }
 
     private func reportTypo(_ typo: Typo)

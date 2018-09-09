@@ -49,7 +49,7 @@ class VariableResolver : SemanticAnalyzer
             guard case (true, _) = uniqueMethodNames.insert(decl.identifier.lexeme) else {
                 throw SemanticError.redefinition(at: decl.identifier)
             }
-            let parametersWithInstance = [Token.this(at: decl.identifier.line)] + decl.parameters
+            let parametersWithInstance = [Token.instanceRef(at: decl.identifier.line)] + decl.parameters
             try self.analyzeFunction(parameters: parametersWithInstance, body: decl.body)
         }
     }
@@ -287,11 +287,6 @@ private extension SemanticError
         return SemanticError(token: token,
                            message: "Redefinition of name '\(token.lexeme)'")
     }
-}
-
-private extension Token
-{
-    var isInstanceRef: Bool { return self.kind == .this }
 }
 
 private extension SemanticWarning

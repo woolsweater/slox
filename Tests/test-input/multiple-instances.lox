@@ -25,7 +25,7 @@ exterminateWhales();    // Prints "Exterminate humpback whales!"
 
 class Person {
     sayName() {
-      print this.name;
+        print this.name;
     }
 }
 

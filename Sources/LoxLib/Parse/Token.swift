@@ -114,10 +114,13 @@ extension Token
      A synthesized token for references to an object within that
      object's methods.
      */
-    static func this(at line: Int) -> Token
+    static func instanceRef(at line: Int) -> Token
     {
         return Token(kind: .this, lexeme: "this", literal: nil, line: line)
     }
+
+    /** Whether this token represents a reference to an object. */
+    var isInstanceRef: Bool { return self.kind == .this }
 
     /** Printable rendering of the `Token` for debugging. */
     var description: String

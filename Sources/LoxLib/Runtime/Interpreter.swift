@@ -134,7 +134,7 @@ class Interpreter
         else { fatalError("Non-method '\(statement)' in class decl method list") }
 
         let methodName = identifier.lexeme
-        let parametersWithInstance = [Token.this(at: identifier.line)] + parameters
+        let parametersWithInstance = [Token.instanceRef(at: identifier.line)] + parameters
         let callable = self.callableFunction(name: methodName,
                                        parameters: parametersWithInstance,
                                              body: body)
