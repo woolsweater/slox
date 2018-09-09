@@ -1,0 +1,39 @@
+// Validate that methods are called on the correct
+// bound instances.
+
+class Dalek {
+    exterminate () {
+        print "Exterminate " + this.species + "!";
+    }
+}
+
+var d = Dalek();
+d.species = "humans";
+var e = Dalek();
+e.species = "humpback whales";
+
+var exterminateHumans = d.exterminate;
+var exterminateWhales = e.exterminate;
+
+d.exterminate();    // Prints "Exterminate humans!"
+e.exterminate();    // Prints "Exterminate humpback whales!"
+
+exterminateHumans();    // Prints "Exterminate humans!"
+exterminateWhales();    // Prints "Exterminate humpback whales!"
+
+// Assigning methods to properties
+
+class Person {
+    sayName() {
+      print this.name;
+    }
+}
+
+var jane = Person();
+jane.name = "Jane";
+
+var bill = Person();
+bill.name = "Bill";
+
+bill.sayName = jane.sayName;
+bill.sayName();    // Prints "Jane"

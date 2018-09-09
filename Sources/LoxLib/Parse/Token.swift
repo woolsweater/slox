@@ -110,6 +110,15 @@ extension Token
         return Token(kind: .EOF, lexeme: "", literal: nil, line: line)
     }
 
+    /**
+     A synthesized token for references to an object within that
+     object's methods.
+     */
+    static func this(at line: Int) -> Token
+    {
+        return Token(kind: .this, lexeme: "this", literal: nil, line: line)
+    }
+
     /** Printable rendering of the `Token` for debugging. */
     var description: String
     {

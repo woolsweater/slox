@@ -28,6 +28,8 @@ indirect enum Expression : Equatable
     case get(object: Expression, member: Token)
     /** An expression assigning a value to a member of an object. */
     case set(object: Expression, member: Token, value: Expression)
+    /** A reference to an object inside one of its methods. */
+    case this(Token, resolution: ScopeResolution)
     /** An expression of a unary operator applied to another expresssion. */
     case unary(op: Token, Expression)
     /** An expression with two subexpressions composed with an operator. */

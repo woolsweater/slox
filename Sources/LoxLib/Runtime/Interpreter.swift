@@ -97,6 +97,8 @@ class Interpreter
                 return try self.evaluateGet(object: object, member: member)
             case let .set(object: object, member: member, value: value):
                 return try self.evaluateSet(object: object, member: member, value: value)
+            case let .this(keyword, resolution: resolution):
+                return try self.lookUp(variable: keyword, resolution: resolution)
             case let .unary(op: opToken, operand):
                 return try self.evaluateUnary(op: opToken, operand)
             case let .binary(left: left, op: opToken, right: right):
@@ -132,7 +134,10 @@ class Interpreter
         else { fatalError("Non-method '\(statement)' in class decl method list") }
 
         let methodName = identifier.lexeme
-        let callable = self.callableFunction(name: methodName, parameters: parameters, body: body)
+        let parametersWithInstance = [Token.this(at: identifier.line)] + parameters
+        let callable = self.callableFunction(name: methodName,
+                                       parameters: parametersWithInstance,
+                                             body: body)
         return (methodName, callable)
     }
 
@@ -381,7 +386,6 @@ class Interpreter
             return value
         }
         else {
-            assertionFailure("Variable '\(variable)' was never resolved and is not a global")
             throw RuntimeError.unresolvedVariable(variable)
         }
     }

@@ -1,6 +1,12 @@
+// Examples from chapter 12
+
 class DevonshireCream {
     serveOn() {
         return "scones";
+    }
+    
+    printClassDesc () {
+        print DevonshireCream;
     }
 }
 
@@ -9,3 +15,28 @@ var d = DevonshireCream();
 d.quantity = 10;
 print d.quantity;
 print "Delicious smeared on " + d.serveOn();
+d.printClassDesc();
+
+class Cake {
+  taste() {
+    var adjective = "delicious";
+    print "The " + this.flavor + " cake is " + adjective + "!";
+  }
+}
+
+var cake = Cake();
+cake.flavor = "German chocolate";
+cake.taste(); // Prints "The German chocolate cake is delicious!".
+
+class Thing {
+  getCallback() {
+    fun localFunction() {
+      print this;
+    }
+
+    return localFunction;
+  }
+}
+
+var callback = Thing().getCallback();
+callback();    // Prints "<instanceof Thing>"

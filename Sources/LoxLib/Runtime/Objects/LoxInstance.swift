@@ -34,8 +34,9 @@ class LoxInstance
         if let value = self.fields[name] {
             return value
         }
-        else if let method = self.klass.instanceMethod(named: name){
-            return .callable(method)
+        else if let method = self.klass.instanceMethod(named: name) {
+            let bound = method.boundTo(object: self)
+            return .callable(bound)
         }
         else {
             throw RuntimeError.unrecognizedMember(member)

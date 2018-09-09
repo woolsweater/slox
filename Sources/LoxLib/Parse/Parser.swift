@@ -550,6 +550,7 @@ class Parser
         if self.match(.false) { return .literal(.bool(false)) }
         if self.match(.true) { return .literal(.bool(true)) }
         if self.match(.nil) { return .literal(.nil) }
+        if self.match(.this) { return .this(self.previous, resolution: ScopeResolution()) }
 
         if self.match(.number, .string) {
             return .literal(self.previous.literal!)

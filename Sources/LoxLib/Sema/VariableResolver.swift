@@ -49,7 +49,8 @@ class VariableResolver : SemanticAnalyzer
             guard case (true, _) = uniqueMethodNames.insert(decl.identifier.lexeme) else {
                 throw SemanticError.redefinition(at: decl.identifier)
             }
-            try self.analyzeFunction(parameters: decl.parameters, body: decl.body)
+            let parametersWithInstance = [Token.this(at: decl.identifier.line)] + decl.parameters
+            try self.analyzeFunction(parameters: parametersWithInstance, body: decl.body)
         }
     }
 
@@ -141,6 +142,8 @@ class VariableResolver : SemanticAnalyzer
             case let .set(object: object, member: _, value: value):
                 try self.analyze(object)
                 try self.analyze(value)
+            case let .this(keyword, resolution: resolution):
+                try self.resolveVariable(keyword, resolution: resolution)
             case let .unary(op: _, operand):
                 try self.analyze(operand)
             case let .binary(left: left, op: _, right: right),
@@ -219,7 +222,9 @@ class VariableResolver : SemanticAnalyzer
     private func endScope() throws
     {
         guard let scope = self.scopes.popLast() else { return }
-        let warnings = scope.values.filter({ $0.isUnused }).map(SemanticWarning.unusedVariable)
+        let warnings = scope.values
+                            .filter({ $0.isUnused && !($0.token.isInstanceRef) })
+                            .map(SemanticWarning.unusedVariable)
         guard warnings.isEmpty else {
             throw SemanticBlockWarning(warnings: warnings)
         }
@@ -282,6 +287,11 @@ private extension SemanticError
         return SemanticError(token: token,
                            message: "Redefinition of name '\(token.lexeme)'")
     }
+}
+
+private extension Token
+{
+    var isInstanceRef: Bool { return self.kind == .this }
 }
 
 private extension SemanticWarning

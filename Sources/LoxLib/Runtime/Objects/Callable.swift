@@ -13,6 +13,13 @@ final class Callable : Equatable, CustomStringConvertible
     /** The name of this function. */
     let name: String
 
+    /**
+     If this is a method, `boundObject` is the object from which the
+     method was accessed. It will be provided as a hidden argument at
+     invocation.
+     */
+    private let boundObject: LoxInstance?
+
     private let thunk: CallableInvocation
 
     init(name: String, arity: Int, thunk: @escaping CallableInvocation)
@@ -20,6 +27,24 @@ final class Callable : Equatable, CustomStringConvertible
         self.name = name
         self.arity = arity
         self.thunk = thunk
+        self.boundObject = nil
+    }
+
+    private init(other: Callable, boundObject: LoxInstance)
+    {
+        self.name = other.name
+        self.arity = other.arity
+        self.thunk = other.thunk
+        self.boundObject = boundObject
+    }
+
+    /**
+     Associate the given object with this method so that it can be accessed
+     within the method body.
+     */
+    func boundTo(object: LoxInstance) -> Callable
+    {
+        return Callable(other: self, boundObject: object)
     }
 
     /**
@@ -31,6 +56,11 @@ final class Callable : Equatable, CustomStringConvertible
                         arguments: [LoxValue])
         throws -> LoxValue
     {
+        var arguments = arguments
+        if let object = self.boundObject {
+            arguments.insert(.instance(object), at: 0)
+        }
+
         guard arguments.count == self.arity else {
             throw RuntimeError.arityMismatch(at: parameterToken,
                                           arity: self.arity,

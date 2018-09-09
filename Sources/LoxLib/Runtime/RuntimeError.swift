@@ -49,11 +49,7 @@ extension RuntimeError
         return RuntimeError(token: token, message: "Expected \(arity) arguments, have \(argCount)")
     }
 
-    /**
-     A variable expression lookup failed.
-     - remark: This represents a bug in the analyzer. We need to halt interpretation
-     even in non-debug builds.
-     */
+    /** A variable expression lookup failed. */
     static func unresolvedVariable(_ variable: Token) -> RuntimeError
     {
         return RuntimeError(token: variable,
