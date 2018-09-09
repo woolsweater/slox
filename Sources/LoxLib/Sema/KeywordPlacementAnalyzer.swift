@@ -82,8 +82,19 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
         self.funcState += state
         defer { self.funcState-- }
 
-        for statement in body {
+        var earlyReturnTokens: [Token] = []
+        for statement in body.dropLast() {
+            if case let .return(token, value: _) = statement {
+                earlyReturnTokens.append(token)
+            }
             try self.analyze(statement)
+        }
+
+        try body.last.flatMap(self.analyze)
+
+        guard earlyReturnTokens.isEmpty else {
+            let warnings = earlyReturnTokens.map(SemanticWarning.prematureReturn)
+            throw SemanticBlockWarning(warnings: warnings)
         }
     }
 
@@ -147,5 +158,14 @@ private extension SemanticError
     static func initReturningValue(at token: Token) -> SemanticError
     {
         return SemanticError(token: token, message: "Cannot return a value from 'init'")
+    }
+}
+
+private extension SemanticWarning
+{
+    static func prematureReturn(at token: Token) -> SemanticWarning
+    {
+        return SemanticWarning(token: token,
+                             message: "Code after 'return' will never be executed")
     }
 }

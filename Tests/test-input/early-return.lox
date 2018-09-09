@@ -1,0 +1,17 @@
+fun f (value) {
+    return 5;    // Warning: Code after return will not be executed
+    if (value == 3) {
+        return 3;    // No warning
+    }
+    return 10;    // Warning: Code after return will not be executed
+    return value * 2;
+}
+
+print f(100);
+
+class C {
+    f () {
+        return "Hello!";    // Warning: Code after return will not be executed
+        return "Goodbye!";
+    }
+}
