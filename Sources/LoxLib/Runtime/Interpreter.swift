@@ -259,7 +259,7 @@ class Interpreter
             return try callable.invoke(using: self, at: paren, arguments: arguments)
         }
         else if case let .class(klass) = callee {
-            return try .instance(klass.allocInit(using: self, arguments: arguments))
+            return try .instance(klass.allocInit(using: self, at: paren, arguments: arguments))
         }
         else {
             throw RuntimeError.notCallable(at: paren)

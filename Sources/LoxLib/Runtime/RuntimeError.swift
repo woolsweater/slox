@@ -67,6 +67,6 @@ extension RuntimeError
     static func unrecognizedMember(_ token: Token) -> RuntimeError
     {
         return RuntimeError(token: token,
-                          message: "No member named \(token.lexeme)")
+                          message: "No member named '\(token.lexeme)'")
     }
 }

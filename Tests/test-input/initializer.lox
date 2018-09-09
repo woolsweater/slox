@@ -1,0 +1,32 @@
+class Orchestra {
+   
+    init (numTrumpets, numViolins, numOboes) {
+        this.numTrumpets = numTrumpets;
+        this.numViolins = numViolins;
+        if (numTrumpets + numViolins > 21) {
+            // Early exit; numOboes will not exist on the instance
+            return;
+        }
+        this.numOboes = numOboes;
+    }
+    
+    describeInstruments () {
+        print this.numTrumpets;
+        print this.numViolins;
+        if (this.numTrumpets + this.numViolins <= 21) {
+            print this.numOboes;
+        }
+    }
+}
+
+var o = Orchestra(3, 5, 10);
+o.describeInstruments();
+
+var notEnoughOboes = Orchestra(100, 9, 10);
+notEnoughOboes.describeInstruments();
+// print notEnoughOboes.numOboes;    // Error; no member named 'numOboes'
+
+class Simple {}
+var s = Simple();
+s.name = "Simon";
+print s.name;
