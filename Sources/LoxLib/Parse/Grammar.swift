@@ -48,8 +48,13 @@ enum Statement : Equatable
      in the class body.
      */
     indirect case classDecl(name: Token, methods: [Statement])
-    /** A statement declaring a named function. */
+    /** A statement declaring a named function or method. */
     indirect case functionDecl(identifier: Token, parameters: [Token], body: [Statement])
+    /**
+     A statement declaring a getter on a class. This is a block of executable code that takes
+     no arguments and must produce a value.
+     */
+    indirect case getterDecl(identifier: Token, body: [Statement])
     /** A statement declaring a variable. An initial value may be provided. */
     case variableDecl(name: Token, initializer: Expression?)
     /** A statment consisting of an expression. */

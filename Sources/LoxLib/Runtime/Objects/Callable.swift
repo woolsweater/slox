@@ -14,6 +14,12 @@ final class Callable : Equatable, CustomStringConvertible
     let name: String
 
     /**
+     If `true`, the value should be invoked when accessed, without requiring
+     an explicit call.
+     */
+    let isImplicitlyInvoked: Bool
+
+    /**
      If this is a method, `boundObject` is the object from which the
      method was accessed. It will be provided as a hidden argument at
      invocation.
@@ -22,9 +28,10 @@ final class Callable : Equatable, CustomStringConvertible
 
     private let thunk: CallableInvocation
 
-    init(name: String, arity: Int, thunk: @escaping CallableInvocation)
+    init(name: String, implicitlyInvoked: Bool = false, arity: Int, thunk: @escaping CallableInvocation)
     {
         self.name = name
+        self.isImplicitlyInvoked = implicitlyInvoked
         self.arity = arity
         self.thunk = thunk
         self.boundObject = nil
@@ -33,6 +40,7 @@ final class Callable : Equatable, CustomStringConvertible
     private init(other: Callable, boundObject: LoxInstance)
     {
         self.name = other.name
+        self.isImplicitlyInvoked = other.isImplicitlyInvoked
         self.arity = other.arity
         self.thunk = other.thunk
         self.boundObject = boundObject
@@ -86,6 +94,8 @@ extension Callable
      - remark: In other words, this creates the runtime representation of a function
      defined in the user's source code.
      - parameter name: The identifier for the function.
+     - parameter kind: The kind of function declaration. A `.getter` will produce a `Callable`
+     with the `isImplicitlyInvoked` flag set.
      - parameter parameters: The list of identifier tokens for the function's parameters.
      May be empty.
      - parameter body: The list of statements contained in the function.
@@ -93,12 +103,14 @@ extension Callable
      allows the function to capture variables from its surrounding scope.
      */
     static func fromDecl(name: String,
+                         kind: FuncKind,
                    parameters: [Token],
                          body: [Statement],
                   environment: Environment)
         -> Callable
     {
-        return Callable(name: name, arity: parameters.count) {
+        let isGetter = (kind == .getter)
+        return Callable(name: name, implicitlyInvoked: isGetter, arity: parameters.count) {
             (interpreter, arguments) in
             let innerEnvironment = Environment(nestedIn: environment)
             for argument in arguments {

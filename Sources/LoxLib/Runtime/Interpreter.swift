@@ -51,6 +51,9 @@ class Interpreter
                 self.evaluateClassDecl(name: name, methods: methods)
             case let .functionDecl(identifier: ident, parameters: parameters, body: body):
                 self.evaluateFunctionDecl(identifier: ident, parameters: parameters, body: body)
+            case .getterDecl(_):
+                // The Parser should not have produced a top-level .getterDecl
+                fatalError("Getter decl should only be present in a class body")
             case let .variableDecl(name: name, initializer: expression):
                 try self.evaluateVariableDecl(name: name, initializer: expression)
             case let .expression(expression):
@@ -88,6 +91,7 @@ class Interpreter
                 return try self.lookUp(variable: name, resolution: resolution)
             case let .anonFunction(id: id, parameters: parameters, body: body):
                 let function = self.callableFunction(name: "__unnamedFunc\(id)",
+                                                     kind: .function,
                                                parameters: parameters,
                                                      body: body)
                 return .callable(function)
@@ -120,23 +124,23 @@ class Interpreter
     {
        let methodMap =
            // Uniqueness of method names checked by VariableResolver
-           Dictionary(uniqueKeysWithValues: methods.map(self.funcStatementToMethod))
+           Dictionary(uniqueKeysWithValues: methods.map(self.statementToMethod))
 
         let klass = LoxClass(name: name.lexeme, methods: methodMap)
 
         self.environment.define(value: .class(klass))
     }
 
-    private func funcStatementToMethod(_ statement: Statement) -> (String, Callable)
+    private func statementToMethod(_ statement: Statement) -> (String, Callable)
     {
-        guard case let
-            .functionDecl(identifier: identifier, parameters: parameters, body: body) = statement
-        else { fatalError("Non-method '\(statement)' in class decl method list") }
+        guard let (identifier, parameters, body, kind) = statement.unpackClassMember() else {
+            fatalError("Non-class-member statement \(statement) in class decl body")
+        }
 
         let methodName = identifier.lexeme
-        let parametersWithInstance = [Token.instanceRef(at: identifier.line)] + parameters
         let callable = self.callableFunction(name: methodName,
-                                       parameters: parametersWithInstance,
+                                             kind: kind,
+                                       parameters: parameters,
                                              body: body)
         return (methodName, callable)
     }
@@ -146,15 +150,22 @@ class Interpreter
     private func evaluateFunctionDecl(identifier: Token, parameters: [Token], body: [Statement])
     {
         let function = self.callableFunction(name: identifier.lexeme,
+                                             kind: .function,
                                        parameters: parameters,
                                              body: body)
+
         self.environment.define(value: .callable(function))
     }
 
     /** Create a `Callable` for a function or method. */
-    private func callableFunction(name: String, parameters: [Token], body: [Statement]) -> Callable
+    private func callableFunction(name: String,
+                                  kind: FuncKind,
+                            parameters: [Token],
+                                  body: [Statement])
+        -> Callable
     {
         let function = Callable.fromDecl(name: name,
+                                         kind: kind,
                                    parameters: parameters,
                                          body: body,
                                   environment: self.environment)
@@ -274,7 +285,14 @@ class Interpreter
             throw RuntimeError.notAnObject(at: member)
         }
 
-        return try instance.get(member)
+        let value = try instance.get(member)
+
+        if case let .callable(getter) = value, getter.isImplicitlyInvoked {
+            return try getter.invoke(using: self, at: member, arguments: [])
+        }
+        else {
+            return value
+        }
     }
 
     private func evaluateSet(object: Expression, member: Token, value: Expression) throws -> LoxValue

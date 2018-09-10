@@ -65,7 +65,7 @@ class Parser
                 if case let .error(typo) = production {
                     self.reportTypo(typo)
                 }
-                return try self.functionDecl(.function)
+                return try self.functionDecl()
             }
             else if self.match(.var) {
                 return try self.variableDecl()
@@ -91,7 +91,7 @@ class Parser
 
         var methods: [Statement] = []
         while !(self.check(.rightBrace)) && !(self.isAtEnd) {
-            methods.append(try self.functionDecl(.method))
+            methods.append(try self.classMember())
         }
 
         try self.mustConsume(.rightBrace, message: "Expected '}' to close class body")
@@ -99,16 +99,35 @@ class Parser
         return .classDecl(name: name, methods: methods)
     }
 
+    /** Parse a method or getter inside a class body. */
+    private func classMember() throws -> Statement
+    {
+        try self.mustConsume(.identifier, message: "Missing name for class member")
+        let ident = self.previous
+        let kind: FuncKind = (self.peek().kind == .leftParen) ? .method : .getter
+
+        let (parameters, body) = try self.finishFunction(kind)
+
+        if kind == .getter {
+            assert(parameters.isEmpty)
+            return .getterDecl(identifier: ident, body: body)
+        }
+        else {
+            return .functionDecl(identifier: ident, parameters: parameters, body: body)
+        }
+    }
+
     /**
      Parse a function or method declaration. The `kind` argument describes which,
      for error reporting.
      */
-    private func functionDecl(_ kind: FuncKind) throws -> Statement
+    private func functionDecl() throws -> Statement
     {
-        try self.mustConsume(.identifier, message: "Missing name for \(kind).")
+        try self.mustConsume(.identifier, message: "Missing name for function.")
         let ident = self.previous
 
-        let (parameters, body) = try self.finishFunction(kind)
+        let (parameters, body) = try self.finishFunction(.function)
+
         return .functionDecl(identifier: ident, parameters: parameters, body: body)
     }
 
@@ -120,9 +139,14 @@ class Parser
 
     private func finishFunction(_ kind: FuncKind) throws -> ([Token], [Statement])
     {
-        try self.mustConsume(.leftParen, message: "Expected '(' to start parameter list.")
-
-        let parameters = try self.parameters()
+        let parameters: [Token]
+        if kind == .getter {
+            parameters = []
+        }
+        else {
+            try self.mustConsume(.leftParen, message: "Expected '(' to start parameter list.")
+            parameters = try self.parameters()
+        }
 
         try self.mustConsume(.leftBrace, message: "Expected '{' to start \(kind) body.")
 

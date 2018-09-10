@@ -20,6 +20,9 @@ class VariableResolver : SemanticAnalyzer
                 try self.analyzeClassDecl(name: name, methods: methods)
             case let .functionDecl(identifier: identifier, parameters: parameters, body: body):
                 try self.analyzeFunctionDecl(identifier, parameters: parameters, body: body)
+            case .getterDecl(_):
+                // The Parser should not have produced a top-level .getterDecl
+                fatalError("Getter decl should only be present in a class body")
             case let .variableDecl(name: name, initializer: initializer):
                 try self.analyzeVariableDecl(name, initializer: initializer)
             case let .expression(expression):
@@ -45,22 +48,17 @@ class VariableResolver : SemanticAnalyzer
         self.define(name: name)
 
         var uniqueMethodNames: Set<String> = []
-        for decl in methods.map(self.unpackMethodDecl) {
-            guard case (true, _) = uniqueMethodNames.insert(decl.identifier.lexeme) else {
-                throw SemanticError.redefinition(at: decl.identifier)
+        for decl in methods {
+            guard let (identifier, parameters, body, _) = decl.unpackClassMember() else {
+                fatalError("Non-class-member statement \(decl) in class decl body")
             }
-            let parametersWithInstance = [Token.instanceRef(at: decl.identifier.line)] + decl.parameters
-            try self.analyzeFunction(parameters: parametersWithInstance, body: decl.body)
+
+            guard case (true, _) = uniqueMethodNames.insert(identifier.lexeme) else {
+                throw SemanticError.redefinition(at: identifier)
+            }
+
+            try self.analyzeFunction(parameters: parameters, body: body)
         }
-    }
-
-    private func unpackMethodDecl(_ statement: Statement) -> (identifier: Token, parameters: [Token], body: [Statement])
-    {
-        guard case let
-            .functionDecl(identifier: identifier, parameters: parameters, body: body) = statement
-        else { fatalError("Non-method '\(statement)' in class method list") }
-
-        return (identifier: identifier, parameters: parameters, body: body)
     }
 
     private func analyzeFunctionDecl(_ identifier: Token, parameters: [Token], body: [Statement]) throws

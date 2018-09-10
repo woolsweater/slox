@@ -35,6 +35,8 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
                 try self.analyzeClass(methods: methods)
             case let .functionDecl(identifier: name, parameters: _, body: body):
                 try self.analyzeFunction(name: name, body: body)
+            case let .getterDecl(identifier: name, body: body):
+                try self.analyzeGetter(name: name, body: body)
             case let .variableDecl(name: _, initializer: initalizer):
                 // Declaration with '.this' as name is caught by the Parser
                 try initalizer.flatMap(self.analyze)
@@ -82,6 +84,19 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
         self.funcState += state
         defer { self.funcState-- }
 
+        try self.finishAnalyzingFunction(name: name, body: body)
+    }
+
+    private func analyzeGetter(name: Token, body: [Statement]) throws
+    {
+        self.funcState += .getter
+        defer { self.funcState-- }
+
+        try self.finishAnalyzingFunction(name: name, body: body)
+    }
+
+    private func finishAnalyzingFunction(name: Token, body: [Statement]) throws
+    {
         var earlyReturnTokens: [Token] = []
         for statement in body.dropLast() {
             if case let .return(token, value: _) = statement {
@@ -90,7 +105,14 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
             try self.analyze(statement)
         }
 
-        try body.last.flatMap(self.analyze)
+        let lastStatement = body.last
+        if self.funcState.current == .getter {
+            guard case .return(_)? = lastStatement else {
+                throw SemanticError.missingReturn(at: name)
+            }
+        }
+
+        try lastStatement.flatMap(self.analyze)
 
         guard earlyReturnTokens.isEmpty else {
             let warnings = earlyReturnTokens.map(SemanticWarning.prematureReturn)
@@ -158,6 +180,12 @@ private extension SemanticError
     static func initReturningValue(at token: Token) -> SemanticError
     {
         return SemanticError(token: token, message: "Cannot return a value from 'init'")
+    }
+
+    static func missingReturn(at token: Token) -> SemanticError
+    {
+        return SemanticError(token: token,
+                           message: "Getter must have return as its final statement")
     }
 }
 

@@ -12,6 +12,11 @@ enum FuncKind : String, Equatable
     /** A method on a class. */
     case method
 
+    /**
+     A getter on a class; this is a function that takes no parameters and must return a value.
+     */
+    case getter
+
     /** An initializer method on a class. */
     case initializer
 }

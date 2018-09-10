@@ -1,0 +1,18 @@
+class DevonshireCream {
+    
+    init (substrate) {
+        this.substrate = substrate;
+    }
+    
+    servingSuggestion {
+        var substrate = this.substrate;
+        return substrate;
+    }
+    
+    describeService () {
+        print "We recommend smearing this on " + this.servingSuggestion + ".";        
+    }
+}
+
+var d = DevonshireCream("scones");
+d.describeService();
