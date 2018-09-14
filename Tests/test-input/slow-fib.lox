@@ -1,0 +1,12 @@
+// Sample program that runs extremely slowly in Lox's
+// tree-walk interpreter. The equivalent C program runs in under
+// a second.
+fun fib(n) {
+  if (n < 2) return n;
+  return fib(n - 1) + fib(n - 2); 
+}
+
+var before = clock();
+print fib(40);
+var after = clock();
+print after - before;
