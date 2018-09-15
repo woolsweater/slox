@@ -5,7 +5,7 @@ declaration    → classDecl
                | varDecl
                | statement ;
 
-classDecl      → "class" IDENTIFIER "{" ( function | getter )* "}" ;
+classDecl      → "class" IDENTIFIER ( "<" IDENTIFIER )? "{" ( function | getter )* "}" ;
 funDecl        → "fun" function ;
 function       → IDENTIFIER "(" parameters? ")" block ;
 getter         → IDENTIFIER "{" statement* returnStmt "}" ;
@@ -62,8 +62,9 @@ unary          → ( "!" | "-" ) unary
                | call ;
 call           → primary ( "(" arguments? ")" | "." IDENTIFIER )* ;
 arguments      → expression ( "," expression )* ;
-primary        → NUMBER | STRING | boolean | "nil"
-               | "(" expression ")"
+primary        → NUMBER | STRING | boolean | "nil" | "this"
                | anonFunction
-               | IDENTIFIER ;
+               | "super" "." IDENTIFIER
+               | IDENTIFIER
+               | "(" expression ")" ;
 anonFunction   → "fun" "(" parameters? ")" block ;

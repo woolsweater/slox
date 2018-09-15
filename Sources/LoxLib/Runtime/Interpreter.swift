@@ -47,8 +47,8 @@ class Interpreter
     private func execute(_ statement: Statement) throws
     {
         switch statement {
-            case let .classDecl(name: name, methods: methods):
-                self.evaluateClassDecl(name: name, methods: methods)
+            case let .classDecl(name: name, superclass: superclass, methods: methods):
+                try self.evaluateClassDecl(name: name, superclass: superclass, methods: methods)
             case let .functionDecl(identifier: ident, parameters: parameters, body: body):
                 self.evaluateFunctionDecl(identifier: ident, parameters: parameters, body: body)
             case .getterDecl(_):
@@ -103,6 +103,11 @@ class Interpreter
                 return try self.evaluateSet(object: object, member: member, value: value)
             case let .this(keyword, resolution: resolution):
                 return try self.lookUp(variable: keyword, resolution: resolution)
+            case let .super(keyword, method: method, classResolution: classRes, instanceResolution: instanceRes):
+                return try self.evaluateSuper(keyword,
+                                              method: method,
+                                     classResolution: classRes,
+                                  instanceResolution: instanceRes)
             case let .unary(op: opToken, operand):
                 return try self.evaluateUnary(op: opToken, operand)
             case let .binary(left: left, op: opToken, right: right):
@@ -120,15 +125,50 @@ class Interpreter
 
     //MARK:- Class declaration
 
-    private func evaluateClassDecl(name: Token, methods: [Statement])
+    private func evaluateClassDecl(name: Token, superclass: Expression?, methods: [Statement]) throws
     {
-       let methodMap =
-           // Uniqueness of method names checked by VariableResolver
-           Dictionary(uniqueKeysWithValues: methods.map(self.statementToMethod))
+        let klass = try self.withSuperclass(superclass) {
+            (superclassValue) in
 
-        let klass = LoxClass(name: name.lexeme, methods: methodMap)
+            let methodMap =
+                // Uniqueness of method names checked by VariableResolver
+                Dictionary(uniqueKeysWithValues: methods.map(self.statementToMethod))
+
+            return LoxClass(name: name.lexeme, superclass: superclassValue, methods: methodMap)
+        }
 
         self.environment.define(value: .class(klass))
+    }
+
+    private func withSuperclass(_ superclassExpr: Expression?,
+                                _ body: (LoxClass?) throws -> LoxClass)
+        throws -> LoxClass
+    {
+        guard let superclass = try superclassExpr.flatMap(self.retrieveSuperclass) else {
+            return try body(nil)
+        }
+
+        let previousEnvironment = self.environment
+        self.environment = Environment(nestedIn: previousEnvironment)
+        defer { self.environment = previousEnvironment }
+
+        self.environment.define(value: .class(superclass))
+        return try body(superclass)
+    }
+
+    private func retrieveSuperclass(using expression: Expression) throws -> LoxClass
+    {
+        guard case let .variable(superclassName, resolution: resolution) = expression else {
+            fatalError("Class decl should have '.variable' in superclass position")
+        }
+
+        let value = try self.lookUp(variable: superclassName, resolution: resolution)
+
+        guard case let .class(superclass) = value else {
+            throw RuntimeError.notAClass(at: superclassName, value: value)
+        }
+
+        return superclass
     }
 
     private func statementToMethod(_ statement: Statement) -> (String, Callable)
@@ -305,6 +345,27 @@ class Interpreter
 
         instance.set(member, to: value)
         return value
+    }
+
+    private func evaluateSuper(_ keyword: Token,
+                                  method: Token,
+                         classResolution: ScopeResolution,
+                      instanceResolution: ScopeResolution)
+        throws -> LoxValue
+    {
+        let instanceToken = Token.instanceRef(at: keyword.line)
+        guard
+            case let .class(klass) =
+                try self.lookUp(variable: keyword, resolution: classResolution),
+            case let .instance(instance) =
+                try self.lookUp(variable: instanceToken, resolution: instanceResolution)
+        else { fatalError("'super' at line \(keyword.line) cannot be resolved") }
+
+        guard let superMethod = klass.instanceMethod(named: method.lexeme) else {
+            throw RuntimeError.unrecognizedMember(method, in: klass.name)
+        }
+
+        return .callable(superMethod.boundTo(object: instance))
     }
 
     //MARK:- Unary

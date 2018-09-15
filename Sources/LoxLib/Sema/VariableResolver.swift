@@ -16,8 +16,8 @@ class VariableResolver : SemanticAnalyzer
     func analyze(_ statement: Statement) throws
     {
         switch statement {
-            case let .classDecl(name: name, methods: methods):
-                try self.analyzeClassDecl(name: name, methods: methods)
+            case let .classDecl(name: name, superclass: superclass, methods: methods):
+                try self.analyzeClassDecl(name: name, superclass: superclass, methods: methods)
             case let .functionDecl(identifier: identifier, parameters: parameters, body: body):
                 try self.analyzeFunctionDecl(identifier, parameters: parameters, body: body)
             case .getterDecl(_):
@@ -42,23 +42,55 @@ class VariableResolver : SemanticAnalyzer
         }
     }
 
-    private func analyzeClassDecl(name: Token, methods: [Statement]) throws
+    private func analyzeClassDecl(name: Token, superclass: Expression?, methods: [Statement]) throws
     {
         try self.declare(name: name)
+
+        var superToken: Token? = nil
+        if let superclass = superclass {
+            guard case let .variable(superName, resolution: resolution) = superclass else {
+                fatalError("Class decl should have '.variable' in superclass position")
+            }
+            try self.resolveVariable(superName, resolution: resolution)
+            superToken = superName
+        }
+
         self.define(name: name)
 
-        var uniqueMethodNames: Set<String> = []
-        for decl in methods {
-            guard let (identifier, parameters, body, _) = decl.unpackClassMember() else {
-                fatalError("Non-class-member statement \(decl) in class decl body")
-            }
+        try self.withSuperDefined(at: superToken) {
 
-            guard case (true, _) = uniqueMethodNames.insert(identifier.lexeme) else {
-                throw SemanticError.redefinition(at: identifier)
-            }
+            var uniqueMethodNames: Set<String> = []
+            for decl in methods {
+                guard let (identifier, parameters, body, _) = decl.unpackClassMember() else {
+                    fatalError("Non-class-member statement \(decl) in class decl body")
+                }
 
-            try self.analyzeFunction(parameters: parameters, body: body)
+                guard case (true, _) = uniqueMethodNames.insert(identifier.lexeme) else {
+                    throw SemanticError.redefinition(at: identifier)
+                }
+
+                try self.analyzeFunction(parameters: parameters, body: body)
+            }
         }
+    }
+
+    private func withSuperDefined(at token: Token?, _ body: () throws -> Void) throws
+    {
+        guard let token = token else {
+            try body()
+            return
+        }
+
+        self.beginScope()
+
+        let superToken = Token.superclass(at: token.line)
+        // New scope, cannot collide with existing name
+        try! self.declare(name: superToken)
+        self.define(name: superToken)
+
+        try body()
+
+        try self.endScope()
     }
 
     private func analyzeFunctionDecl(_ identifier: Token, parameters: [Token], body: [Statement]) throws
@@ -142,6 +174,8 @@ class VariableResolver : SemanticAnalyzer
                 try self.analyze(value)
             case let .this(keyword, resolution: resolution):
                 try self.resolveVariable(keyword, resolution: resolution)
+            case let .super(keyword, method: _, classResolution: classRes, instanceResolution: instanceRes):
+                try self.resolveSuper(keyword, classResolution: classRes, instanceResolution: instanceRes)
             case let .unary(op: _, operand):
                 try self.analyze(operand)
             case let .binary(left: left, op: _, right: right),
@@ -169,6 +203,15 @@ class VariableResolver : SemanticAnalyzer
         }
 
         // Not found. Assume it is global.
+    }
+
+    private func resolveSuper(_ keyword: Token,
+                        classResolution: ScopeResolution,
+                     instanceResolution: ScopeResolution) throws
+    {
+        try self.resolveVariable(keyword, resolution: classResolution)
+        try self.resolveVariable(Token.instanceRef(at: keyword.line),
+                                 resolution: instanceResolution)
     }
 
     private func analyzeCall(_ callee: Expression, arguments: [Expression]) throws

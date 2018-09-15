@@ -15,9 +15,10 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
 
     /**
      Track class nesting so that a `this` reference outside a class can be
-     reported as an error.
+     reported as an error. We also note that we are in a class with a superclass
+     so that `super` references can be analyzed.
      */
-    private var classState = NestingCounter()
+    private var classState = StateTracker<ClassKind>()
 
     /**
      Track kinds of function declarations so illegal `return` statements can
@@ -31,8 +32,8 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
     func analyze(_ statement: Statement) throws
     {
         switch statement {
-            case let .classDecl(name: _, methods: methods):
-                try self.analyzeClass(methods: methods)
+            case let .classDecl(name: _, superclass: superclass, methods: methods):
+                try self.analyzeClass(methods: methods, hasSuperclass: superclass != nil)
             case let .functionDecl(identifier: name, parameters: _, body: body):
                 try self.analyzeFunction(name: name, body: body)
             case let .getterDecl(identifier: name, body: body):
@@ -64,9 +65,9 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
 
     //MARK:- Statement analysis
 
-    private func analyzeClass(methods: [Statement]) throws
+    private func analyzeClass(methods: [Statement], hasSuperclass: Bool) throws
     {
-        self.classState++
+        self.classState += hasSuperclass ? .subClass : .baseClass
         defer { self.classState-- }
 
         for method in methods {
@@ -145,8 +146,20 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
     private func analyze(_ expression: Expression) throws
     {
         switch expression {
+            case let .call(object, paren: _, arguments: arguments):
+                try self.analyze(object)
+                for argument in arguments {
+                    try self.analyze(argument)
+                }
+            case let Expression.get(object: object, member: _):
+                try self.analyze(object)
+            case let Expression.set(object: object, member: _, value: value):
+                try self.analyze(object)
+                try self.analyze(value)
             case let .this(keyword, resolution: _):
                 try self.analyzeInstanceRef(keyword)
+            case let .super(keyword, method: _, classResolution: _, instanceResolution: _):
+                try self.analyzeSuper(keyword)
             default:
                 return
         }
@@ -154,10 +167,23 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
 
     private func analyzeInstanceRef(_ keyword: Token) throws
     {
-        guard self.funcState.current ~ [.method, .initializer] else {
+        guard self.funcState.current ~ [.method, .initializer, .getter] else {
             throw SemanticError.misplacedObjectRef(at: keyword)
         }
     }
+
+    private func analyzeSuper(_ keyword: Token) throws
+    {
+        guard self.classState.current == .subClass else {
+            throw SemanticError.misplacedSuper(at: keyword)
+        }
+    }
+}
+
+/** Indicator whether we are analyzing a class that has a superclass or not. */
+private enum ClassKind
+{
+    case baseClass, subClass
 }
 
 private extension SemanticError
@@ -175,6 +201,11 @@ private extension SemanticError
     static func misplacedObjectRef(at token: Token) -> SemanticError
     {
         return SemanticError(token: token, message: "Cannot use '\(token.lexeme)' outside a method")
+    }
+
+    static func misplacedSuper(at token: Token) -> SemanticError
+    {
+        return SemanticError(token: token, message: "Cannot use 'super' in a class with no superclas")
     }
 
     static func initReturningValue(at token: Token) -> SemanticError

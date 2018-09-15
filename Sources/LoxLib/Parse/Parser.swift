@@ -85,8 +85,15 @@ class Parser
 
     private func classDecl() throws -> Statement
     {
-        try self.mustConsume(.identifier, message: "Missing class name")
+        try self.mustConsume(.identifier, message: "Expected class name")
         let name = self.previous
+
+        var superclass: Expression? = nil
+        if self.match(.less) {
+            try self.mustConsume(.identifier, message: "Expected superclass name")
+            superclass = .variable(self.previous, resolution: ScopeResolution())
+        }
+
         try self.mustConsume(.leftBrace, message: "Expected '{' to begin class body")
 
         var methods: [Statement] = []
@@ -96,7 +103,7 @@ class Parser
 
         try self.mustConsume(.rightBrace, message: "Expected '}' to close class body")
 
-        return .classDecl(name: name, methods: methods)
+        return .classDecl(name: name, superclass: superclass, methods: methods)
     }
 
     /** Parse a method or getter inside a class body. */
@@ -581,20 +588,30 @@ class Parser
 
     private func primary() throws -> Expression
     {
+        if self.match(.number, .string) {
+            return .literal(self.previous.literal!)
+        }
+
         if self.match(.false) { return .literal(.bool(false)) }
         if self.match(.true) { return .literal(.bool(true)) }
         if self.match(.nil) { return .literal(.nil) }
         if self.match(.this) { return .this(self.previous, resolution: ScopeResolution()) }
-
-        if self.match(.number, .string) {
-            return .literal(self.previous.literal!)
-        }
 
         if let production = self.match(.fun, orTypo: .func) {
             if case let .error(typo) = production {
                 self.reportTypo(typo)
             }
             return try self.anonFunction()
+        }
+
+        if self.match(.super) {
+            let keyword = self.previous
+            try self.mustConsume(.dot, message: "Expected '.' after 'super'")
+            try self.mustConsume(.identifier, message: "Must have member name in super expression")
+            return .super(keyword,
+                          method: self.previous,
+                 classResolution: ScopeResolution(),
+              instanceResolution: ScopeResolution())
         }
 
         if self.match(.identifier) {

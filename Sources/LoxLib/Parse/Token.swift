@@ -119,8 +119,14 @@ extension Token
         return Token(kind: .this, lexeme: "this", literal: nil, line: line)
     }
 
+    /** A synthesized token for `super` references within a class to resolve to. */
+    static func superclass(at line: Int) -> Token
+    {
+        return Token(kind: .super, lexeme: "super", literal: nil, line: line)
+    }
+
     /** Whether this token represents a reference to an object. */
-    var isInstanceRef: Bool { return self.kind == .this }
+    var isInstanceRef: Bool { return self.kind ~ [.this, .super] }
 
     /** Printable rendering of the `Token` for debugging. */
     var description: String

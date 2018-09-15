@@ -6,6 +6,8 @@ public class Lox
 
     private static var interpreter: Interpreter!
 
+    private static var currentFilename: String?
+
     public static func main(_ args: [String]) -> Int32
     {
         let args = Array(args.dropFirst())
@@ -15,12 +17,14 @@ public class Lox
         }
 
         if let path = args.first {
+            self.currentFilename = path
             self.interpreter = Interpreter(replMode: false)
             do { try self.runFile(path) }
             catch ExecError.interpretation { return ExitCode.interpreterFailure.returnValue }
             catch { return ExitCode.badInput.returnValue }
         }
         else {
+            self.currentFilename = "<<interactive>>"
             self.interpreter = Interpreter(replMode: true)
             self.runPrompt()
         }
@@ -38,7 +42,7 @@ public class Lox
      */
     static func report(at line: Int, location: String, message: String)
     {
-        StdErr.print("[line \(line)] Error \(location): \(message)")
+        StdErr.print("\(self.currentFilename!):\(line): error: \(location), \(message)")
         self.hasError = true
     }
 
@@ -48,7 +52,7 @@ public class Lox
      */
     static func warn(at line: Int, location: String, message: String)
     {
-        StdErr.print("[line: \(line)] Warning \(location): \(message)")
+        StdErr.print("\(self.currentFilename!):\(line): warning: \(location), \(message)")
     }
 
     private enum ExecError : Error

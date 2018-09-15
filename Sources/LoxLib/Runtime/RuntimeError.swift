@@ -63,10 +63,17 @@ extension RuntimeError
                           message: "Target of member access is not an object")
     }
 
-    /** The name given in a member access was not found on the object. */
-    static func unrecognizedMember(_ token: Token) -> RuntimeError
+    /** A value lookup expected a `.class` but another type of value was found. */
+    static func notAClass(at token: Token, value: LoxValue) -> RuntimeError
     {
         return RuntimeError(token: token,
-                          message: "No member named '\(token.lexeme)'")
+                          message: "Expected a class, but found value of type '.\(value)'")
+    }
+
+    /** The name given in a member access was not found on the object. */
+    static func unrecognizedMember(_ token: Token, in classname: String) -> RuntimeError
+    {
+        return RuntimeError(token: token,
+                          message: "No member named '\(token.lexeme)' found in class '\(classname)'")
     }
 }

@@ -39,7 +39,7 @@ class LoxInstance
             return .callable(bound)
         }
         else {
-            throw RuntimeError.unrecognizedMember(member)
+            throw RuntimeError.unrecognizedMember(member, in: self.klass.name)
         }
     }
 

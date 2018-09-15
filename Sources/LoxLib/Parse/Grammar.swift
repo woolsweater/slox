@@ -30,6 +30,11 @@ indirect enum Expression : Equatable
     case set(object: Expression, member: Token, value: Expression)
     /** A reference to an object inside one of its methods. */
     case this(Token, resolution: ScopeResolution)
+    /**
+     A reference to a method in the parent class of this current class. At interpretation time,
+     we need to access both the superclass value and the curent instance.
+     */
+    case `super`(Token, method: Token, classResolution: ScopeResolution, instanceResolution: ScopeResolution)
     /** An expression of a unary operator applied to another expresssion. */
     case unary(op: Token, Expression)
     /** An expression with two subexpressions composed with an operator. */
@@ -47,7 +52,7 @@ enum Statement : Equatable
      A declaration of a class. The `methods` list is the `.functionDecl`s contained
      in the class body.
      */
-    indirect case classDecl(name: Token, methods: [Statement])
+    indirect case classDecl(name: Token, superclass: Expression?, methods: [Statement])
     /** A statement declaring a named function or method. */
     indirect case functionDecl(identifier: Token, parameters: [Token], body: [Statement])
     /**

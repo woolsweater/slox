@@ -6,6 +6,9 @@ class LoxClass
     /** The class's identifier in the interpreted source. */
     let name: String
 
+    /** The class from which this class inherits, if any. */
+    let superclass: LoxClass?
+
     /**
      The initializer, if any, for this class.
      - remark: Stored separately from other methods because it can only be
@@ -17,9 +20,10 @@ class LoxClass
     private let methods: [String : Callable]
 
     /** Create a class with the given name and method list. */
-    init(name: String, methods: [String : Callable])
+    init(name: String, superclass: LoxClass?, methods: [String : Callable])
     {
         self.name = name
+        self.superclass = superclass
         var regularMethods = methods
         self.initializer =
             regularMethods.removeValue(forKey: LoxClass.initializerName)
@@ -59,7 +63,7 @@ class LoxClass
      */
     func instanceMethod(named name: String) -> Callable?
     {
-        return self.methods[name]
+        return self.methods[name] ?? self.superclass?.instanceMethod(named: name)
     }
 }
 
