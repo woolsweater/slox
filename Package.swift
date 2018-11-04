@@ -13,6 +13,10 @@ let package = Package(
             name: "LoxLib",
             targets: ["LoxLib"]
         ),
+        .executable(
+            name: "loxvm",
+            targets: ["loxvm"]
+        ),
     ],
     dependencies: [],
     targets: [
@@ -22,6 +26,10 @@ let package = Package(
         ),
         .target(
             name: "LoxLib",
+            dependencies: []
+        ),
+        .target(
+            name: "loxvm",
             dependencies: []
         ),
         .testTarget(
