@@ -3,7 +3,7 @@ import Foundation
 /** A single instruction for the VM. */
 enum OpCode : UInt8
 {
-    case `return`, constant
+    case `return`, constant, constantLong
 }
 
 /** A sequence of bytecode with auxiliary information. */
@@ -16,10 +16,10 @@ struct Chunk
     private(set) var constants: [Value] = []
 
     /**
-     The line in the original source code corresponding to each item
-     in `code`. Used for debugging.
+     The lines in the original source code corresponding to each item
+     in `code`. Run-length encoded. Used for debugging.
      */
-    private(set) var lineNumbers: [Int] = []
+    private var lineNumbers: [(Int, count: Int)] = []
 }
 
 extension Chunk
@@ -31,7 +31,12 @@ extension Chunk
     mutating func write(byte: UInt8, line: Int)
     {
         self.code.append(byte)
-        self.lineNumbers.append(line)
+        if line == lineNumbers.last?.0 {
+            self.lineNumbers.settableLast.count += 1
+        }
+        else {
+            self.lineNumbers.append((line, count: 1))
+        }
     }
 
     /**
@@ -44,12 +49,82 @@ extension Chunk
     }
 
     /**
+     Add the given constant value, which corresponds to an item at `line`
+     in the original source, to the `Chunk`'s storage.
+     */
+    mutating func write(constant: Value, line: Int)
+    {
+        let idx = self.add(constant: constant)
+
+        if idx <= UInt8.max {
+            self.write(opCode: .constant, line: line)
+            self.write(byte: UInt8(idx), line: line)
+        }
+        else if idx <= Int.threeByteMax {
+            self.write(opCode: .constantLong, line: line)
+            self.write(triple: idx, line: line)
+        }
+        else {
+            fatalError("Chunk exceeded constant limit: \(idx)")
+        }
+    }
+
+    private mutating func write(triple: Int, line: Int)
+    {
+        guard triple <= Int.threeByteMax else {
+            fatalError("Input too large: \(triple)")
+        }
+
+        var triple = triple
+        withUnsafeBytes(of: &triple) { (buf) in
+            // Big-endian!
+            self.write(byte: buf[2], line: line)
+            self.write(byte: buf[1], line: line)
+            self.write(byte: buf[0], line: line)
+        }
+    }
+
+    /**
      Add the given constant value to the `Chunk`'s storage. The index
      where it is stored is returned.
      */
-    mutating func add(constant: Value) -> UInt8
+    private mutating func add(constant: Value) -> Int
     {
         self.constants.append(constant)
-        return UInt8(self.constants.count - 1)
+        return self.constants.count - 1
     }
+}
+
+//MARK:- Line numbers
+
+extension Chunk
+{
+    /**
+     Produce the line number in the original source code for the item found
+     at `offset` in the chunk's `code`.
+     */
+    func lineNumber(forByteAt offset: Int) -> Int
+    {
+        var runningCount = 0
+        let record = self.lineNumbers.first(where: { (record) in
+            defer { runningCount += record.count }
+            return runningCount + record.count > offset
+        })
+
+        return record!.0
+    }
+}
+
+private extension Array
+{
+    var settableLast: Element
+    {
+        get { return self[self.endIndex - 1] }
+        set { self[self.endIndex - 1] = newValue }
+    }
+}
+
+private extension Int
+{
+    static let threeByteMax = 16777215
 }

@@ -20,8 +20,8 @@ private func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
 {
     print(String(format:"%04d", offset), terminator: " ")
 
-    let lineNumber = chunk.lineNumbers[offset]
-    if offset > 0 && lineNumber == chunk.lineNumbers[offset - 1] {
+    let lineNumber = chunk.lineNumber(forByteAt: offset)
+    if offset > 0 && lineNumber == chunk.lineNumber(forByteAt: offset - 1) {
         print("   |", terminator: " ")
     }
     else {
@@ -34,6 +34,8 @@ private func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
             return simpleInstruction("OP_RETURN", offset)
         case OpCode.constant.rawValue:
             return constantInstruction("OP_CONSTANT", chunk, offset)
+        case OpCode.constantLong.rawValue:
+            return constantInstruction("OP_CONSTANT_LONG", chunk, offset, isLong: true)
         default:
             print("Unknown opcode \(instruction)")
             return offset + 1
@@ -48,14 +50,26 @@ private func simpleInstruction(_ name: String, _ offset: Int) -> Int
 
 private func constantInstruction(_ name: String,
                                  _ chunk: Chunk,
-                                 _ instructionOffset: Int)
+                                 _ instructionOffset: Int,
+                                 isLong: Bool = false)
     -> Int
 {
-    let idx = chunk.code[instructionOffset + 1]
-    print(String(format: "%-16@ %4d", name, idx), terminator: " ")
-    printValue(chunk.constants[Int(idx)])
+    let idx = isLong ? calculateConstantIndex(chunk, instructionOffset + 1)
+                     : Int(chunk.code[instructionOffset + 1])
+    let paddedName = name.padding(toLength: 16, withPad: " ", startingAt: 0)
+    print(String(format: "%@ %4d", paddedName, idx), terminator: " ")
+    printValue(chunk.constants[idx])
 
-    return instructionOffset + 2
+    return instructionOffset + (isLong ? 4 : 2)
+}
+
+private func calculateConstantIndex(_ chunk: Chunk, _ offset: Int) -> Int
+{
+    return chunk.code[offset..<offset+3].reduce(into: 0, {
+        (int, byte) in
+        int <<= 8
+        int |= Int(byte)
+    })
 }
 
 private func printValue(_ value: Value)
