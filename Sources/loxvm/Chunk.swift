@@ -3,7 +3,10 @@ import Foundation
 /** A single instruction for the VM. */
 enum OpCode : UInt8
 {
-    case `return`, constant, constantLong
+    case `return`
+    case constant, constantLong
+    case negate
+    case add, subtract, multiply, divide
 }
 
 /** A sequence of bytecode with auxiliary information. */
@@ -32,7 +35,7 @@ extension Chunk
     {
         self.code.append(byte)
         if line == lineNumbers.last?.0 {
-            self.lineNumbers.settableLast.count += 1
+            self.lineNumbers.mutableLast.count += 1
         }
         else {
             self.lineNumbers.append((line, count: 1))
@@ -71,16 +74,14 @@ extension Chunk
 
     private mutating func write(triple: Int, line: Int)
     {
-        guard triple <= Int.threeByteMax else {
-            fatalError("Input too large: \(triple)")
-        }
+        precondition(triple <= Int.threeByteMax, "Input too large: \(triple)")
 
         var triple = triple
         withUnsafeBytes(of: &triple) { (buf) in
-            // Big-endian!
-            self.write(byte: buf[2], line: line)
-            self.write(byte: buf[1], line: line)
+            // Host order, to support memcpy when read
             self.write(byte: buf[0], line: line)
+            self.write(byte: buf[1], line: line)
+            self.write(byte: buf[2], line: line)
         }
     }
 
@@ -117,7 +118,11 @@ extension Chunk
 
 private extension Array
 {
-    var settableLast: Element
+    /**
+     Get and set this array's final element.
+     - warning: Traps if the array is empty.
+     */
+    var mutableLast: Element
     {
         get { return self[self.endIndex - 1] }
         set { self[self.endIndex - 1] = newValue }
@@ -126,5 +131,6 @@ private extension Array
 
 private extension Int
 {
+    /** The highest value that can be stored in three bytes unsigned. */
     static let threeByteMax = 16777215
 }
