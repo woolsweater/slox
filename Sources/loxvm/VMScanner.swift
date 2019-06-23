@@ -3,11 +3,16 @@ import Foundation
 /** State of source scanning for the Lox VM */
 class VMScanner
 {
+    /** Text of the source code to be scanned. */
     private let source: Substring
+    /** Location of the scanner within the source text. */
     private var currentSourceIndex: Substring.Index
+    /** Location of the first character of the item currently being scanned. */
     private var lexemeStartIndex: Substring.Index
+    /** Current line in the source text. */
     private var lineNumber: Int
 
+    /** Create a scanner for the given text. */
     init(source: String)
     {
         self.source = source[...]
@@ -56,16 +61,24 @@ extension Token
 
 extension VMScanner
 {
+    /** Text of the lexical item currently being scanned. */
     private var currentLexeme: Substring
     {
         return self.source[self.lexemeStartIndex..<self.currentSourceIndex]
     }
 
+    /** Whether the scanner has reached the end of the source text. */
     private var hasMoreToScan: Bool
     {
         return self.currentSourceIndex < self.source.endIndex
     }
 
+    /**
+     Inspect the source text at the current scan location and produce the
+     appropriate `Token`.
+     - remark: This may result in an error token if there is a problem
+     scanning.
+     */
     func scanToken() -> Token
     {
         self.skipWhitespaceAndComments()
@@ -111,6 +124,12 @@ extension VMScanner
         return self.makeToken(ofKind: nextKind)
     }
 
+    /**
+     Process the source from the current location, moving past any
+     whitespace and line or block comments. Advance the `lineNumber`
+     count as necessary. Upon return, the current scan location will be
+     at the next semantically significant character.
+     */
     private func skipWhitespaceAndComments()
     {
         while let char = self.peek() {
@@ -139,12 +158,21 @@ extension VMScanner
 
     //MARK:- Basic operations
 
+    /**
+     Unless the scanner is at the end of the source, produce the next
+     character to be scanned without advancing the index.
+     */
     private func peek() -> Character?
     {
         guard self.hasMoreToScan else { return nil }
         return self.source[self.currentSourceIndex]
     }
 
+    /**
+     Unless the scanner is at or past the penultimate source character,
+     produce the character after the next character to be scanned,
+     without advancing the index.
+     */
     private func peekAfter() -> Character?
     {
         let nextIndex = self.source.index(after: self.currentSourceIndex)
@@ -152,12 +180,17 @@ extension VMScanner
         return self.source[nextIndex]
     }
 
+    /** Return the next character in the source, advancing the index. */
     private func readNext() -> Character
     {
         defer { self.advanceIndex() }
         return self.source[self.currentSourceIndex]
     }
 
+    /**
+     Advance the index if the next character to be scanned matches the
+     given character.
+     */
     private func readMatch(_ char: Character) -> Bool
     {
         guard self.hasMoreToScan else { return false }
@@ -176,13 +209,30 @@ extension VMScanner
 
     //MARK:- Scanning specific types
 
+    /**
+     Scan past and discard characters until the end of the line (or the entire
+     source, whichever comes first).
+     - precondition: The scan position should be at the opening `//` of the
+     comment.
+     */
     private func skipLineComment()
     {
+        precondition(self.readMatch("/"))
+        precondition(self.readMatch("/"))
+
         while let char = self.peek(), char != "\n" {
             self.advanceIndex()
         }
     }
 
+    /**
+     Scan past and discard characters in a block comment, until the closing
+     delimiter (or the end of the source, whichever comes first).
+     - precondition: The scan position should be at the opening delimiter of the
+     comment.
+     - remark: Any block comment opening delimiters within the comment are simply ignored;
+     nested comments are not allowed.
+     */
     private func skipBlockComment()
     {
         precondition(self.readMatch("/"))
@@ -201,6 +251,13 @@ extension VMScanner
         return    // Unterminated comment
     }
 
+    /**
+     Scan a string literal.
+     - precondition: The scan position should be just past the opening quote mark of the
+     string.
+     - returns: A `Token` for the string, or an error `Token` if the end of the file
+     was reached before a closing quote mark.
+     */
     private func readString() -> Token
     {
         while let char = self.peek(), char != "\"" {
@@ -351,6 +408,7 @@ private extension Character
     var canStartIdentifier: Bool
     {
         guard self.unicodeScalars.count == 1 else { return false }
+        if self.isDigit { return false }
         return CharacterSet.loxIdentifiers.contains(self.unicodeScalars.first!)
     }
 }

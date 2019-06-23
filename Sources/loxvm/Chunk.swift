@@ -35,7 +35,7 @@ extension Chunk
     {
         self.code.append(byte)
         if line == lineNumbers.last?.0 {
-            self.lineNumbers.mutableLast.count += 1
+            self.lineNumbers.mutateLast { $0.count += 1 }
         }
         else {
             self.lineNumbers.append((line, count: 1))
@@ -119,13 +119,14 @@ extension Chunk
 private extension Array
 {
     /**
-     Get and set this array's final element.
+     Directly change the value of the last element using the given function.
      - warning: Traps if the array is empty.
      */
-    var mutableLast: Element
+    mutating func mutateLast(_ mutate: (inout Element) -> Void)
     {
-        get { return self[self.endIndex - 1] }
-        set { self[self.endIndex - 1] = newValue }
+        precondition(!(self.isEmpty))
+        let lastIndex = self.indices.last!
+        mutate(&self[lastIndex])
     }
 }
 
