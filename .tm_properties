@@ -1,4 +1,5 @@
 WSS_SWIFT_TESTS_MODULE_NAME = LoxLib
 
 [ source.swift ]
+WSS_COMMENT_BLOCK_CONTINUE = ""
 wrapColumn = 96
