@@ -1,6 +1,6 @@
 import Foundation
 
-/** Interpreter of a series of bytecode instructions in `Chunk`. */
+/** Interpreter of a series of bytecode instructions in a `Chunk`. */
 class VM
 {
     /**
@@ -23,11 +23,12 @@ enum InterpretResult
 
 extension VM
 {
-    /** Interpret the code in the given chunk, reporting whether an error occurred. */
-    func interpret(chunk: Chunk) -> InterpretResult
+    /** Interpret the given source code, reporting whether an error occurred. */
+    func interpret(source: String) -> InterpretResult
     {
-        self.chunk = chunk
-        return self.run()
+        let compiler = Compiler(source: source)
+        _ = compiler.compile()
+        return .okay
     }
 
     private func run() -> InterpretResult
