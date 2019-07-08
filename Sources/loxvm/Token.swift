@@ -31,7 +31,7 @@ extension Token
         case identifier, string, number
 
         // Keywords
-        case and, `break`, `class`, `else`, `false`, fun, `for`, `if`, `nil`, or
+        case and, `break`, `class`, `else`, `false`, `for`, fun, `if`, `nil`, or
         case print, `return`, `super`, this, `true`, unless, until, `var`, `while`
 
         case EOF

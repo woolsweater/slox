@@ -54,21 +54,24 @@ extension Chunk
     /**
      Add the given constant value, which corresponds to an item at `line`
      in the original source, to the `Chunk`'s storage.
+     - returns: `false` if there are too many constants already present in the chunk.
      */
-    mutating func write(constant: Value, line: Int)
+    mutating func write(constant: Value, line: Int) -> Bool
     {
         let idx = self.add(constant: constant)
 
         if idx <= UInt8.max {
             self.write(opCode: .constant, line: line)
             self.write(byte: UInt8(idx), line: line)
+            return true
         }
         else if idx <= Int.threeByteMax {
             self.write(opCode: .constantLong, line: line)
             self.write(triple: idx, line: line)
+            return true
         }
         else {
-            fatalError("Chunk exceeded constant limit: \(idx)")
+            return false
         }
     }
 

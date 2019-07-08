@@ -27,8 +27,13 @@ extension VM
     func interpret(source: String) -> InterpretResult
     {
         let compiler = Compiler(source: source)
-        _ = compiler.compile()
-        return .okay
+        guard let compiledChunk = compiler.compile() else {
+            return .compileError
+        }
+
+        self.chunk = compiledChunk
+
+        return self.run()
     }
 
     private func run() -> InterpretResult
