@@ -30,27 +30,28 @@ func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
         print(String(format: "%04d", lineNumber), terminator: " ")
     }
 
-    let instruction = chunk.code[offset]
+    guard let instruction = OpCode(rawValue: chunk.code[offset]) else {
+        print("Unknown opcode '\(chunk.code[offset])'")
+        return offset + 1
+    }
+
     switch instruction {
-        case OpCode.return.rawValue:
+        case .return:
             return simpleInstruction("OP_RETURN", offset)
-        case OpCode.constant.rawValue:
+        case .constant:
             return constantInstruction("OP_CONSTANT", chunk, offset)
-        case OpCode.constantLong.rawValue:
+        case .constantLong:
             return constantInstruction("OP_CONSTANT_LONG", chunk, offset, isLong: true)
-        case OpCode.negate.rawValue:
+        case .negate:
             return simpleInstruction("OP_NEGATE", offset)
-        case OpCode.add.rawValue:
+        case .add:
             return simpleInstruction("OP_ADD", offset)
-        case OpCode.subtract.rawValue:
+        case .subtract:
             return simpleInstruction("OP_SUBTRACT", offset)
-        case OpCode.multiply.rawValue:
+        case .multiply:
             return simpleInstruction("OP_MULTIPLY", offset)
-        case OpCode.divide.rawValue:
+        case .divide:
             return simpleInstruction("OP_DIVIDE", offset)
-        default:
-            print("Unknown opcode '\(instruction)'")
-            return offset + 1
     }
 }
 
@@ -79,14 +80,24 @@ private func calculateLongConstantIndex(_ chunk: Chunk, _ offset: Int) -> Int
 {
     let byteCount = 3
     return chunk.code[offset..<offset+byteCount].withUnsafeBytes {
-        var int: Int = 0
+        var int: UInt32 = 0
         memcpy(&int, $0.baseAddress, byteCount)
-        return int
+        return Int(CFSwapInt32LittleToHost(int))
     }
 }
 
 private func printValue(_ value: Value)
 {
-    let description = String(format: "%g", value)
+    let description: String
+    if case let .number(number) = value {
+        description = String(format: "%g", number)
+    }
+    else if case let .bool(boolean) = value {
+        description = "\(boolean)"
+    }
+    else {
+        description = "nil"
+    }
+
     print("'\(description)'")
 }

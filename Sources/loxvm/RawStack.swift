@@ -33,6 +33,14 @@ struct RawStack<Element>
         self.top -= 1
         return self.top.pointee
     }
+
+    /** Return the value at the given distance from the top of the stack, keeping it in place. */
+    func peek(distance: Int = 0) -> Element
+    {
+        let address = self.top - 1 - distance
+        assert(address >= self.buffer.baseAddress!)
+        return address.pointee
+    }
 }
 
 #if DEBUG_TRACE_EXECUTION

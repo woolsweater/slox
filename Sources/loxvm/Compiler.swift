@@ -44,7 +44,7 @@ extension Compiler
     {
         self.advance()
         self.expression()
-        self.mustConsume(.EOF, message: "Expected end of expression")
+        self.mustConsume(.EOF, message: "Expected end of expression.")
 
         guard self.state == .normal else {
             return nil
@@ -162,7 +162,7 @@ extension Compiler
         guard let value = Double(self.previousToken.lexeme) else {
             fatalError("Failed to convert token '\(self.previousToken.lexeme)' to a Value")
         }
-        self.emitConstant(value: value)
+        self.emitConstant(value: .number(value))
     }
 
     private func unary()

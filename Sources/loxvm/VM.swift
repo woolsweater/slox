@@ -10,6 +10,8 @@ class VM
 
     /** The bytecode currently being interpreted. */
     private(set) var chunk: Chunk!
+    /** Index into the bytecode. */
+    private var ip: InstructionPointer!
     /** Storage space for values derived from interpretation. */
     private var stack = RawStack<Value>(size: VM.stackMaxSize)
 }
@@ -32,6 +34,7 @@ extension VM
         }
 
         self.chunk = compiledChunk
+        self.ip = InstructionPointer(code: self.chunk.code)
 
         return self.run()
     }
@@ -40,50 +43,83 @@ extension VM
     {
         guard self.chunk?.code.isEmpty == false else { return .okay }
 
-        var ip = InstructionPointer(code: self.chunk.code)
-        repeat {
+        while true {
+
             #if DEBUG_TRACE_EXECUTION
             print("        ")
             self.stack.printContents()
             _ = disassembleInstruction(self.chunk, offset: ip.address)
             #endif
-            guard let opCode = ip.advanceTakingOpCode() else {
+
+            guard let opCode = self.ip.advanceTakingOpCode() else {
                 fatalError("Unknown instruction: '\(ip.pointee)'")
             }
-            switch opCode {
-                case .return:
-                    print(self.stack.pop())
-                    return .okay
-                case .constant:
-                    let offset = ip.advanceTakingInt()
-                    let constant = self.chunk.constants[offset]
-                    self.stack.push(constant)
-                case .constantLong:
-                    let offset = ip.advanceTakingThreeByteInt()
-                    let constant = self.chunk.constants[offset]
-                    self.stack.push(constant)
-                case .negate:
-                    let value = self.stack.pop()
-                    self.stack.push(-value)
-                case .add:
-                    self.performBinaryOp(+)
-                case .subtract:
-                    self.performBinaryOp(-)
-                case .multiply:
-                    self.performBinaryOp(*)
-                case .divide:
-                    self.performBinaryOp(/)
-                default:
-                    fatalError("Unhandled instruction: '\(opCode)'")
+
+            do {
+                switch opCode {
+                    case .return:
+                        print(self.stack.pop())
+                        return .okay
+                    case .constant:
+                        let offset = self.ip.advanceTakingInt()
+                        let constant = self.chunk.constants[offset]
+                        self.stack.push(constant)
+                    case .constantLong:
+                        let offset = self.ip.advanceTakingThreeByteInt()
+                        let constant = self.chunk.constants[offset]
+                        self.stack.push(constant)
+                    case .negate:
+                        guard case let .number(value) = self.stack.peek() else {
+                            self.reportRuntimeError("Operand must be a number.")
+                            return .runtimeError
+                        }
+                        _ = self.stack.pop()
+                        self.stack.push(.number(-value))
+                    case .add:
+                        try self.performBinaryOp(+)
+                    case .subtract:
+                        try self.performBinaryOp(-)
+                    case .multiply:
+                        try self.performBinaryOp(*)
+                    case .divide:
+                        try self.performBinaryOp(/)
+                    default:
+                        fatalError("Unhandled instruction: '\(opCode)'")
+                }
             }
-        } while true
+            catch {
+                return .runtimeError
+            }
+
+        }
     }
 
-    private func performBinaryOp(_ operation: (Value, Value) -> Value)
+    private struct BinaryOperandError : Error {}
+
+    private func performBinaryOp(_ operation: (Double, Double) -> Double) throws
     {
-        let rhs = self.stack.pop()
-        let lhs = self.stack.pop()
-        self.stack.push(operation(lhs, rhs))
+        guard
+            case let .number(right) = self.stack.peek(),
+            case let .number(left) = self.stack.peek(distance: 1) else
+        {
+            self.reportRuntimeError("Operands must be numbers.")
+            throw BinaryOperandError()
+        }
+
+        _ = self.stack.pop()
+        _ = self.stack.pop()
+
+        self.stack.push(.number(operation(left, right)))
+
+    }
+
+    //MARK:- Error reporting
+
+    private func reportRuntimeError(_ format: String, _ values: CVarArg...)
+    {
+        let message = String(format: format, arguments: values)
+        let lineNumber = self.chunk.lineNumber(forByteAt: self.ip.address)
+        StdErr.print("\(lineNumber): error: Runtime Error: \(message)")
     }
 }
 
@@ -91,11 +127,6 @@ extension VM
 private struct InstructionPointer
 {
     typealias Code = [UInt8]
-
-    static func += (lhs: inout InstructionPointer, rhs: Code.Index)
-    {
-        lhs.address += rhs
-    }
 
     /** The current index into the bytes. */
     private(set) var address: Code.Index
@@ -119,6 +150,11 @@ private struct InstructionPointer
 
 private extension InstructionPointer
 {
+    static func += (lhs: inout InstructionPointer, rhs: Code.Index)
+    {
+        lhs.address += rhs
+    }
+
     /**
      Try to form an `OpCode` value with the current `pointee`, moving the pointer ahead
      by one byte if successful.
@@ -137,7 +173,10 @@ private extension InstructionPointer
         return Int(self.pointee)
     }
 
-    /** Construct an `Int` with the next three byte values, little-endian-wise. */
+    /**
+     Construct an `Int` with the next three byte values, little-endian-wise, then step the pointer
+     past those bytes.
+     */
     mutating func advanceTakingThreeByteInt() -> Int
     {
         let byteCount = 3
