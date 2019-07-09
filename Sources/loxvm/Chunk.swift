@@ -79,9 +79,8 @@ extension Chunk
     {
         precondition(triple <= Int.threeByteMax, "Input too large: \(triple)")
 
-        var triple = triple
+        var triple = triple.littleEndian
         withUnsafeBytes(of: &triple) { (buf) in
-            // Host order, to support memcpy when read
             self.write(byte: buf[0], line: line)
             self.write(byte: buf[1], line: line)
             self.write(byte: buf[2], line: line)
