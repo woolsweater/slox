@@ -68,9 +68,18 @@ extension VM
                         let offset = self.ip.advanceTakingThreeByteInt()
                         let constant = self.chunk.constants[offset]
                         self.stack.push(constant)
+                    case .nil:
+                        self.stack.push(.nil)
+                    case .true:
+                        self.stack.push(.bool(true))
+                    case .false:
+                        self.stack.push(.bool(false))
+                    case .not:
+                        let value = self.stack.pop()
+                        self.stack.push(.bool(value.isFalsey))
                     case .negate:
                         guard case let .number(value) = self.stack.peek() else {
-                            self.reportRuntimeError("Operand must be a number.")
+                            self.reportRuntimeError("Operand to '-' must be a number.")
                             return .runtimeError
                         }
                         _ = self.stack.pop()
@@ -83,8 +92,6 @@ extension VM
                         try self.performBinaryOp(*)
                     case .divide:
                         try self.performBinaryOp(/)
-                    default:
-                        fatalError("Unhandled instruction: '\(opCode)'")
                 }
             }
             catch {

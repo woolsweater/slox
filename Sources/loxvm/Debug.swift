@@ -42,6 +42,14 @@ func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
             return constantInstruction("OP_CONSTANT", chunk, offset)
         case .constantLong:
             return constantInstruction("OP_CONSTANT_LONG", chunk, offset, isLong: true)
+        case .nil:
+            return simpleInstruction("OP_NIL", offset)
+        case .true:
+            return simpleInstruction("OP_TRUE", offset)
+        case .false:
+            return simpleInstruction("OP_FALSE", offset)
+        case .not:
+            return simpleInstruction("OP_NOT", offset)
         case .negate:
             return simpleInstruction("OP_NEGATE", offset)
         case .add:

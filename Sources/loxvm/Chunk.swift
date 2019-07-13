@@ -5,6 +5,8 @@ enum OpCode : UInt8
 {
     case `return`
     case constant, constantLong
+    case `nil`, `true`, `false`
+    case not
     case negate
     case add, subtract, multiply, divide
 }

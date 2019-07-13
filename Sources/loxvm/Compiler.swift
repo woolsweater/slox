@@ -151,6 +151,20 @@ extension Compiler
         }
     }
 
+    private func literal()
+    {
+        switch self.previousToken.kind {
+            case .nil:
+                self.emitByte(for: .nil)
+            case .true:
+                self.emitByte(for: .true)
+            case .false:
+                self.emitByte(for: .false)
+            default:
+                fatalError("Token is not a literal: \(self.previousToken)")
+        }
+    }
+
     private func grouping()
     {
         self.expression()
@@ -172,6 +186,7 @@ extension Compiler
         self.parse(fromPrecedence: .unary)
 
         switch operatorKind {
+            case .bang: self.emitByte(for: .not)
             case .minus: self.emitByte(for: .negate)
             default:
                 fatalError("Token had non-unary Kind '\(operatorKind)'")
@@ -276,7 +291,7 @@ private extension Compiler
             case .plus         : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .term)
             case .slash        : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .factor)
             case .star         : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .factor)
-            case .bang         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .bang         : return ParseRule(prefix: Compiler.unary, infix: nil, precedence: .none)
             case .bangEqual    : return ParseRule(prefix: nil, infix: nil, precedence: .equality)
             case .equal        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .equalEqual   : return ParseRule(prefix: nil, infix: nil, precedence: .equality)
@@ -291,17 +306,17 @@ private extension Compiler
             case .break        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .class        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .else         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .false        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .false        : return ParseRule(prefix: Compiler.literal, infix: nil, precedence: .none)
             case .for          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .fun          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .if           : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .nil          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .nil          : return ParseRule(prefix: Compiler.literal, infix: nil, precedence: .none)
             case .or           : return ParseRule(prefix: nil, infix: nil, precedence: .or)
             case .print        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .return       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .super        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .this         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .true         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .true         : return ParseRule(prefix: Compiler.literal, infix: nil, precedence: .none)
             case .unless       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .until        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .var          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
