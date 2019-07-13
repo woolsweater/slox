@@ -8,6 +8,7 @@ enum OpCode : UInt8
     case `nil`, `true`, `false`
     case not
     case negate
+    case equal, greater, less
     case add, subtract, multiply, divide
 }
 

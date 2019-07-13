@@ -84,14 +84,22 @@ extension VM
                         }
                         _ = self.stack.pop()
                         self.stack.push(.number(-value))
+                    case .equal:
+                        let right = self.stack.pop()
+                        let left = self.stack.pop()
+                        self.stack.push(.bool(left == right))
+                    case .less:
+                        try self.performBinaryOp(<, wrapper: Value.bool)
+                    case .greater:
+                        try self.performBinaryOp(>, wrapper: Value.bool)
                     case .add:
-                        try self.performBinaryOp(+)
+                        try self.performBinaryOp(+, wrapper: Value.number)
                     case .subtract:
-                        try self.performBinaryOp(-)
+                        try self.performBinaryOp(-, wrapper: Value.number)
                     case .multiply:
-                        try self.performBinaryOp(*)
+                        try self.performBinaryOp(*, wrapper: Value.number)
                     case .divide:
-                        try self.performBinaryOp(/)
+                        try self.performBinaryOp(/, wrapper: Value.number)
                 }
             }
             catch {
@@ -103,7 +111,7 @@ extension VM
 
     private struct BinaryOperandError : Error {}
 
-    private func performBinaryOp(_ operation: (Double, Double) -> Double) throws
+    private func performBinaryOp<T>(_ operation: (Double, Double) -> T, wrapper: (T) -> Value) throws
     {
         guard
             case let .number(right) = self.stack.peek(),
@@ -116,8 +124,7 @@ extension VM
         _ = self.stack.pop()
         _ = self.stack.pop()
 
-        self.stack.push(.number(operation(left, right)))
-
+        self.stack.push(wrapper(operation(left, right)))
     }
 
     //MARK:- Error reporting

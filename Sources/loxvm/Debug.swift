@@ -36,52 +36,32 @@ func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
     }
 
     switch instruction {
-        case .return:
-            return simpleInstruction("OP_RETURN", offset)
-        case .constant:
-            return constantInstruction("OP_CONSTANT", chunk, offset)
-        case .constantLong:
-            return constantInstruction("OP_CONSTANT_LONG", chunk, offset, isLong: true)
-        case .nil:
-            return simpleInstruction("OP_NIL", offset)
-        case .true:
-            return simpleInstruction("OP_TRUE", offset)
-        case .false:
-            return simpleInstruction("OP_FALSE", offset)
-        case .not:
-            return simpleInstruction("OP_NOT", offset)
-        case .negate:
-            return simpleInstruction("OP_NEGATE", offset)
-        case .add:
-            return simpleInstruction("OP_ADD", offset)
-        case .subtract:
-            return simpleInstruction("OP_SUBTRACT", offset)
-        case .multiply:
-            return simpleInstruction("OP_MULTIPLY", offset)
-        case .divide:
-            return simpleInstruction("OP_DIVIDE", offset)
+        case .constant, .constantLong:
+            return constantInstruction(instruction, chunk, offset)
+        default:
+            return simpleInstruction(instruction, offset)
     }
 }
 
-private func simpleInstruction(_ name: String, _ offset: Int) -> Int
+private func simpleInstruction(_ code: OpCode, _ offset: Int) -> Int
 {
-    print(name)
-    return offset + 1
+    print(code.debugName)
+    return offset + code.stepSize
 }
 
-private func constantInstruction(_ name: String,
+private func constantInstruction(_ code: OpCode,
                                  _ chunk: Chunk,
-                                 _ instructionOffset: Int,
-                                 isLong: Bool = false)
+                                 _ instructionOffset: Int)
     -> Int
 {
+    let isLong = (code == .constantLong)
     let idx = isLong ? calculateLongConstantIndex(chunk, instructionOffset + 1)
                      : Int(chunk.code[instructionOffset + 1])
-    let paddedName = name.padding(toLength: 16, withPad: " ", startingAt: 0)
+    let paddedName = code.debugName.padding(toLength: 16, withPad: " ", startingAt: 0)
     print(String(format: "%@ %4d", paddedName, idx), terminator: " ")
     printValue(chunk.constants[idx])
 
-    return instructionOffset + (isLong ? 4 : 2)
+    return instructionOffset + code.stepSize
 }
 
 private func calculateLongConstantIndex(_ chunk: Chunk, _ offset: Int) -> Int
@@ -108,4 +88,37 @@ private func printValue(_ value: Value)
     }
 
     print("'\(description)'")
+}
+
+private extension OpCode
+{
+    var debugName: String
+    {
+        switch self {
+            case .return: return "OP_RETURN"
+            case .constant: return "OP_CONSTANT"
+            case .constantLong: return "OP_CONSTANT_LONG"
+            case .nil: return "OP_NIL"
+            case .true: return "OP_TRUE"
+            case .false: return "OP_FALSE"
+            case .not: return "OP_NOT"
+            case .negate: return "OP_NEGATE"
+            case .equal: return "OP_EQUAL"
+            case .greater: return "OP_GREATER"
+            case .less: return "OP_LESS"
+            case .add: return "OP_ADD"
+            case .subtract: return "OP_SUBTRACT"
+            case .multiply: return "OP_MULTIPLY"
+            case .divide: return "OP_DIVIDE"
+        }
+    }
+
+    var stepSize: Int
+    {
+        switch self {
+            case .constant: return 2
+            case .constantLong: return 4
+            default: return 1
+        }
+    }
 }

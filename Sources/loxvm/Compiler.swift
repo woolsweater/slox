@@ -142,10 +142,16 @@ extension Compiler
         self.parse(fromPrecedence: precedence.incremented())
 
         switch operatorKind {
-            case .plus: self.emitByte(for: .add)
-            case .minus: self.emitByte(for: .subtract)
-            case .star: self.emitByte(for: .multiply)
-            case .slash: self.emitByte(for: .divide)
+            case .bangEqual: self.emitBytes(for: .equal, .not)
+            case .equalEqual: self.emitBytes(for: .equal)
+            case .greater: self.emitBytes(for: .greater)
+            case .greaterEqual: self.emitBytes(for: .less, .not)
+            case .less: self.emitBytes(for: .less)
+            case .lessEqual: self.emitBytes(for: .greater, .not)
+            case .minus: self.emitBytes(for: .subtract)
+            case .plus: self.emitBytes(for: .add)
+            case .star: self.emitBytes(for: .multiply)
+            case .slash: self.emitBytes(for: .divide)
             default:
                 fatalError("Token had non-binary Kind '\(operatorKind)'")
         }
@@ -155,11 +161,11 @@ extension Compiler
     {
         switch self.previousToken.kind {
             case .nil:
-                self.emitByte(for: .nil)
+                self.emitBytes(for: .nil)
             case .true:
-                self.emitByte(for: .true)
+                self.emitBytes(for: .true)
             case .false:
-                self.emitByte(for: .false)
+                self.emitBytes(for: .false)
             default:
                 fatalError("Token is not a literal: \(self.previousToken)")
         }
@@ -186,8 +192,8 @@ extension Compiler
         self.parse(fromPrecedence: .unary)
 
         switch operatorKind {
-            case .bang: self.emitByte(for: .not)
-            case .minus: self.emitByte(for: .negate)
+            case .bang: self.emitBytes(for: .not)
+            case .minus: self.emitBytes(for: .negate)
             default:
                 fatalError("Token had non-unary Kind '\(operatorKind)'")
         }
@@ -197,7 +203,7 @@ extension Compiler
 
     private func emitReturn()
     {
-        self.emitByte(for: .return)
+        self.emitBytes(for: .return)
     }
 
     private func emitConstant(value: Value)
@@ -208,9 +214,11 @@ extension Compiler
         }
     }
 
-    private func emitByte(for opCode: OpCode)
+    private func emitBytes(for opCodes: OpCode...)
     {
-        self.chunk.write(opCode: opCode, line: self.previousToken.lineNumber)
+        for code in opCodes {
+            self.chunk.write(opCode: code, line: self.previousToken.lineNumber)
+        }
     }
 
     //MARK:- Error reporting
@@ -292,13 +300,13 @@ private extension Compiler
             case .slash        : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .factor)
             case .star         : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .factor)
             case .bang         : return ParseRule(prefix: Compiler.unary, infix: nil, precedence: .none)
-            case .bangEqual    : return ParseRule(prefix: nil, infix: nil, precedence: .equality)
+            case .bangEqual    : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .equality)
             case .equal        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .equalEqual   : return ParseRule(prefix: nil, infix: nil, precedence: .equality)
-            case .greater      : return ParseRule(prefix: nil, infix: nil, precedence: .comparison)
-            case .greaterEqual : return ParseRule(prefix: nil, infix: nil, precedence: .comparison)
-            case .less         : return ParseRule(prefix: nil, infix: nil, precedence: .comparison)
-            case .lessEqual    : return ParseRule(prefix: nil, infix: nil, precedence: .comparison)
+            case .equalEqual   : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .equality)
+            case .greater      : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
+            case .greaterEqual : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
+            case .less         : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
+            case .lessEqual    : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
             case .identifier   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .string       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .number       : return ParseRule(prefix: Compiler.number, infix: nil, precedence: .none)
