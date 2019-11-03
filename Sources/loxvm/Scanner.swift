@@ -266,29 +266,29 @@ extension Scanner
     private func currentIdentifierKind() -> Token.Kind
     {
         switch self.currentLexeme.first! {
-            case "a": return self.checkForKeyword(at: 1, length: 2, rest: "nd", kind: .and)
-            case "c": return self.checkForKeyword(at: 1, length: 4, rest: "lass", kind: .class)
-            case "e": return self.checkForKeyword(at: 1, length: 3, rest: "lse", kind: .else)
+            case "a": return self.checkForKeyword(at: 1, rest: "nd", kind: .and)
+            case "c": return self.checkForKeyword(at: 1, rest: "lass", kind: .class)
+            case "e": return self.checkForKeyword(at: 1, rest: "lse", kind: .else)
             case "f":
                 guard self.currentLexeme.count > 2 else { break }
                 switch self.source[self.source.index(after: self.lexemeStartIndex)] {
-                    case "a": return self.checkForKeyword(at: 2, length: 3, rest: "lse", kind: .false)
-                    case "o": return self.checkForKeyword(at: 2, length: 1, rest: "r", kind: .for)
-                    case "u": return self.checkForKeyword(at: 2, length: 1, rest: "n", kind: .fun)
+                    case "a": return self.checkForKeyword(at: 2, rest: "lse", kind: .false)
+                    case "o": return self.checkForKeyword(at: 2, rest: "r", kind: .for)
+                    case "u": return self.checkForKeyword(at: 2, rest: "n", kind: .fun)
                     default: break
                 }
                 break
-            case "i": return self.checkForKeyword(at: 1, length: 1, rest: "f", kind: .if)
-            case "n": return self.checkForKeyword(at: 1, length: 2, rest: "il", kind: .nil)
-            case "o": return self.checkForKeyword(at: 1, length: 1, rest: "r", kind: .or)
-            case "p": return self.checkForKeyword(at: 1, length: 4, rest: "rint", kind: .print)
-            case "r": return self.checkForKeyword(at: 1, length: 5, rest: "eturn", kind: .return)
-            case "s": return self.checkForKeyword(at: 1, length: 4, rest: "uper", kind: .super)
+            case "i": return self.checkForKeyword(at: 1, rest: "f", kind: .if)
+            case "n": return self.checkForKeyword(at: 1, rest: "il", kind: .nil)
+            case "o": return self.checkForKeyword(at: 1, rest: "r", kind: .or)
+            case "p": return self.checkForKeyword(at: 1, rest: "rint", kind: .print)
+            case "r": return self.checkForKeyword(at: 1, rest: "eturn", kind: .return)
+            case "s": return self.checkForKeyword(at: 1, rest: "uper", kind: .super)
             case "t":
                 guard self.currentLexeme.count > 3 else { break }
                 switch self.source[self.source.index(after: self.lexemeStartIndex)] {
-                    case "h": return self.checkForKeyword(at: 2, length: 2, rest: "is", kind: .this)
-                    case "r": return self.checkForKeyword(at: 2, length: 2, rest: "ue", kind: .true)
+                    case "h": return self.checkForKeyword(at: 2, rest: "is", kind: .this)
+                    case "r": return self.checkForKeyword(at: 2, rest: "ue", kind: .true)
                     default: break
                 }
                 break
@@ -298,13 +298,13 @@ extension Scanner
                     self.source[self.source.index(after: self.lexemeStartIndex)] == "n"
                 else { break }
                 switch self.source[self.source.index(self.lexemeStartIndex, offsetBy: 2)] {
-                    case "l": return self.checkForKeyword(at: 3, length: 4, rest: "less", kind: .unless)
-                    case "t": return self.checkForKeyword(at: 3, length: 3, rest: "til", kind: .until)
+                    case "l": return self.checkForKeyword(at: 3, rest: "less", kind: .unless)
+                    case "t": return self.checkForKeyword(at: 3, rest: "til", kind: .until)
                     default: break
                 }
                 break
-            case "v": return self.checkForKeyword(at: 1, length: 2, rest: "ar", kind: .var)
-            case "w": return self.checkForKeyword(at: 1, length: 4, rest: "hile", kind: .while)
+            case "v": return self.checkForKeyword(at: 1, rest: "ar", kind: .var)
+            case "w": return self.checkForKeyword(at: 1, rest: "hile", kind: .while)
             default:
                 break
         }
@@ -313,12 +313,11 @@ extension Scanner
     }
 
     private func checkForKeyword(at offset: Int,
-                                    length: Int,
                                       rest: String,
                                       kind: Token.Kind)
         -> Token.Kind
     {
-        if self.currentLexeme.count == offset + length {
+        if self.currentLexeme.count == offset + rest.count {
             let trailingStart = self.source.index(self.lexemeStartIndex, offsetBy: offset)
             let trailing = self.source[trailingStart..<self.currentSourceIndex]
             if trailing == rest {

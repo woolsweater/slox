@@ -37,7 +37,7 @@ extension Chunk
     mutating func write(byte: UInt8, line: Int)
     {
         self.code.append(byte)
-        if line == lineNumbers.last?.0 {
+        if line == self.lineNumbers.last?.0 {
             self.lineNumbers.mutateLast { $0.count += 1 }
         }
         else {
