@@ -15,7 +15,7 @@ typedef struct _Obj {
 #define IS_STR(o) (((Obj *)(o))->kind == 1)
 
 typedef struct _Str {
-    int kind;
+    Obj obj;
     buf chars;
 } Str;
 

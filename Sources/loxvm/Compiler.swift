@@ -199,6 +199,15 @@ extension Compiler
         }
     }
 
+    private func string()
+    {
+//        let bytes = self.previousToken.lexeme.utf8
+//        let firstCharIndex = bytes.index(after: bytes.startIndex)
+//        let lastCharIndex = bytes.index(bytes.endIndex, offsetBy: -2)
+//        let string = Object.StringRef(bytes: bytes[firstCharIndex..<lastCharIndex])
+//        self.emitConstant(value: .object(string.asBaseRef()))
+    }
+
     //MARK:- Chunk handling
 
     private func emitReturn()
@@ -308,7 +317,7 @@ private extension Compiler
             case .less         : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
             case .lessEqual    : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
             case .identifier   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .string       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .string       : return ParseRule(prefix: Compiler.string, infix: nil, precedence: .none)
             case .number       : return ParseRule(prefix: Compiler.number, infix: nil, precedence: .none)
             case .and          : return ParseRule(prefix: nil, infix: nil, precedence: .and)
             case .break        : return ParseRule(prefix: nil, infix: nil, precedence: .none)

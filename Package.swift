@@ -1,4 +1,4 @@
-// swift-tools-version:4.0
+// swift-tools-version:5.0
 
 import PackageDescription
 
@@ -30,6 +30,10 @@ let package = Package(
         ),
         .target(
             name: "loxvm",
+            dependencies: ["loxvm-object"]
+        ),
+        .target(
+            name: "loxvm-object",
             dependencies: []
         ),
         .testTarget(
