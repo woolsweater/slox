@@ -4,3 +4,4 @@
 /*.xcodeproj
 commit-message.md
 DerivedData
+.make.*
