@@ -1,4 +1,5 @@
 import Foundation
+import loxvm_object
 
 /**
  Emit a human-readable representation of the given `Chunk`, with information
@@ -77,14 +78,15 @@ private func calculateLongConstantIndex(_ chunk: Chunk, _ offset: Int) -> Int
 private func printValue(_ value: Value)
 {
     let description: String
-    if case let .number(number) = value {
-        description = String(format: "%g", number)
-    }
-    else if case let .bool(boolean) = value {
-        description = "\(boolean)"
-    }
-    else {
-        description = "nil"
+    switch value {
+        case let .number(number):
+            description = String(format: "%g", number)
+        case let .bool(boolean):
+            description = "\(boolean)"
+        case .nil:
+            description = "nil"
+        case .object(_):
+            description = value.debugDescription
     }
 
     print("'\(description)'")

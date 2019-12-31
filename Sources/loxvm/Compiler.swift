@@ -1,4 +1,5 @@
 import Foundation
+import loxvm_object
 
 /**
  Translator from a token stream to bytecode stored in a `Chunk`, using a `Scanner` as a helper
@@ -25,15 +26,20 @@ class Compiler
     private var state: State = .normal
 
     private let scanner: Scanner
+    private let allocator: MemoryManager
     private var currentToken: Token = .dummy
     private var previousToken: Token = .dummy
 
     private var chunk: Chunk = Chunk()
 
-    /** Create a compiler to operate on the given source. */
-    init(source: String)
+    /**
+     Create a compiler to operate on the given source, obtaining any neccessary heap memory
+     from the provided allocator.
+     */
+    init(source: String, allocator: MemoryManager)
     {
         self.scanner = Scanner(source: source)
+        self.allocator = allocator
     }
 }
 
@@ -201,11 +207,20 @@ extension Compiler
 
     private func string()
     {
-//        let bytes = self.previousToken.lexeme.utf8
-//        let firstCharIndex = bytes.index(after: bytes.startIndex)
-//        let lastCharIndex = bytes.index(bytes.endIndex, offsetBy: -2)
-//        let string = Object.StringRef(bytes: bytes[firstCharIndex..<lastCharIndex])
-//        self.emitConstant(value: .object(string.asBaseRef()))
+        let lexeme = self.previousToken.lexeme
+        // Drop quote marks
+        let firstCharIndex = lexeme.index(after: lexeme.startIndex)
+        let lastCharIndex = lexeme.index(lexeme.endIndex, offsetBy: -1)
+        let substring = lexeme[firstCharIndex..<lastCharIndex]
+
+        let stringObject = substring.withCStringBuffer { (chars) -> StringRef in
+            let terminatedSize = MemoryLayout<CStr.Element>.size * (chars.count + 1)
+            let buf = self.allocator.allocateBuffer(of: CStr.Element.self, size: terminatedSize)
+            let obj = self.allocator.allocateObject(ObjectString.self, kind: .string)
+            return StringRef.initialize(obj, copying: chars, into: buf)
+        }
+
+        self.emitConstant(value: .object(stringObject.asBaseRef()))
     }
 
     //MARK:- Chunk handling
@@ -375,5 +390,13 @@ private extension Token
     static var dummy: Token
     {
         return Token(kind: .EOF, lexeme: "not a token", lineNumber: -1)
+    }
+}
+
+private extension StringProtocol {
+    func withCStringBuffer<Result>(_ body: (ConstCStr) -> Result) -> Result {
+        self.withCString { (chars) -> Result in
+            body(UnsafeBufferPointer<Int8>.init(start: chars, count: self.utf8.count))
+        }
     }
 }

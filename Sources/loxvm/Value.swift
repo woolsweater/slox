@@ -6,7 +6,25 @@ enum Value
     case bool(Bool)
     case `nil`
     case number(Double)
-    case object(Object)
+    case object(ObjectRef)
+}
+
+extension Value : CustomDebugStringConvertible
+{
+    var debugDescription: String
+    {
+        switch self {
+            case let .bool(value): return "bool(\(value))"
+            case .nil: return "nil"
+            case let .number(value): return "number(\(value))"
+            case let .object(obj):
+                switch obj.pointee.kind {
+                    case .string:
+                        let contents = String(cString: obj.asStringRef().pointee.chars)
+                        return "String(\(contents))"
+            }
+        }
+    }
 }
 
 extension Value
@@ -39,6 +57,24 @@ extension Value : Equatable
                 return left == right
             case (.nil, .nil):
                 return true
+            case let (.object(left), .object(right)):
+                return ObjectRef.equalObjects(left, right)
+            default:
+                return false
+        }
+    }
+}
+
+extension ObjectRef
+{
+    static func equalObjects(_ lhs: ObjectRef, _ rhs: ObjectRef) -> Bool
+    {
+        switch (lhs.pointee.kind, rhs.pointee.kind) {
+            case (.string, .string):
+                let left = lhs.asStringRef().pointee
+                let right = rhs.asStringRef().pointee
+                return left.length == right.length &&
+                    memcmp(left.chars, right.chars, left.length) == 0
             default:
                 return false
         }

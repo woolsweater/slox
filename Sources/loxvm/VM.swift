@@ -1,4 +1,5 @@
 import Foundation
+import loxvm_object
 
 /** Interpreter of a series of bytecode instructions in a `Chunk`. */
 class VM
@@ -14,6 +15,8 @@ class VM
     private var ip: InstructionPointer!
     /** Storage space for values derived from interpretation. */
     private var stack = RawStack<Value>(size: VM.stackMaxSize)
+    /** Creator and tracker for heap allocations. */
+    private let allocator = MemoryManager()
 }
 
 enum InterpretResult
@@ -28,7 +31,7 @@ extension VM
     /** Interpret the given source code, reporting whether an error occurred. */
     func interpret(source: String) -> InterpretResult
     {
-        let compiler = Compiler(source: source)
+        let compiler = Compiler(source: source, allocator: self.allocator)
         guard let compiledChunk = compiler.compile() else {
             return .compileError
         }
@@ -93,7 +96,12 @@ extension VM
                     case .greater:
                         try self.performBinaryOp(>, wrapper: Value.bool)
                     case .add:
-                        try self.performBinaryOp(+, wrapper: Value.number)
+                        if case .object(_) = self.stack.peek(), case .object(_) = self.stack.peek(distance: 1) {
+                            try self.concatenate()
+                        }
+                        else {
+                            try self.performBinaryOp(+, wrapper: Value.number)
+                        }
                     case .subtract:
                         try self.performBinaryOp(-, wrapper: Value.number)
                     case .multiply:
@@ -105,8 +113,33 @@ extension VM
             catch {
                 return .runtimeError
             }
-
         }
+    }
+
+    private func concatenate() throws
+    {
+        guard
+            case let .object(right) = self.stack.peek(), right.pointee.kind == .string,
+            case let .object(left) = self.stack.peek(distance: 1), left.pointee.kind == .string else
+        {
+            self.reportRuntimeError("Operands must both be strings")
+            throw BinaryOperandError()
+        }
+
+        _ = self.stack.pop()
+        _ = self.stack.pop()
+
+        let leftString = left.asStringRef().pointee
+        let rightString = right.asStringRef().pointee
+        let finalLength = leftString.length + rightString.length + 1
+        let concatenated = self.allocator.allocateBuffer(of: CStr.Element.self, size: finalLength)
+        memcpy(concatenated.baseAddress, leftString.chars, leftString.length)
+        memcpy(concatenated.baseAddress! + leftString.length - 1, rightString.chars, rightString.length)
+        concatenated[finalLength - 1] = 0x0
+
+        let obj = self.allocator.allocateObject(ObjectString.self, kind: .string)
+        let result = StringRef.initialize(obj, takingChars: concatenated).asBaseRef()
+        self.stack.push(.object(result))
     }
 
     private struct BinaryOperandError : Error {}
