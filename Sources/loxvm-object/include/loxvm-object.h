@@ -6,8 +6,8 @@
 #define LOX_ENUM(TYPE) enum __attribute__((enum_extensibility(closed))) : TYPE
 
 /**
- Tag to distinguish different object subtypes, which have different
- associated data.
+ Tag to distinguish different object subtypes, which each have
+ their own associated data.
  */
 typedef LOX_ENUM(uint32_t) {
 
@@ -20,9 +20,9 @@ typedef LOX_ENUM(uint32_t) {
  Common data required for a value in a Lox program that requires more
  storage than a simple scalar. All more specific object structs include
  this as a "header".
- - remark: These definitions are made in C rather than Swift to take
- advantage of the guaranteed layout that permits structs sharing this
- header to be handled generically through pointers.
+ - remark: These definitions are made in C rather than Swift so that the
+ layout is guaranteed. Structs sharing the `Object` header can be handled
+ generically through pointers because of that guarantee.
  */
 typedef struct _Object {
     /** Tag for the subtype. */

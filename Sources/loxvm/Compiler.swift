@@ -396,7 +396,7 @@ private extension Token
 private extension StringProtocol {
     func withCStringBuffer<Result>(_ body: (ConstCStr) -> Result) -> Result {
         self.withCString { (chars) -> Result in
-            body(UnsafeBufferPointer<Int8>.init(start: chars, count: self.utf8.count))
+            body(ConstCStr(start: chars, count: self.utf8.count))
         }
     }
 }

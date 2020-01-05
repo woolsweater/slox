@@ -18,11 +18,7 @@ extension Value : CustomDebugStringConvertible
             case .nil: return "nil"
             case let .number(value): return "number(\(value))"
             case let .object(obj):
-                switch obj.pointee.kind {
-                    case .string:
-                        let contents = String(cString: obj.asStringRef().pointee.chars)
-                        return "String(\(contents))"
-            }
+                return ObjectRef.debuggerDescription(of: obj)
         }
     }
 }
@@ -67,6 +63,10 @@ extension Value : Equatable
 
 extension ObjectRef
 {
+    /**
+     Determine the subtype of the given objects and compare their payloads as
+     appropriate.
+     */
     static func equalObjects(_ lhs: ObjectRef, _ rhs: ObjectRef) -> Bool
     {
         switch (lhs.pointee.kind, rhs.pointee.kind) {
@@ -77,6 +77,19 @@ extension ObjectRef
                     memcmp(left.chars, right.chars, left.length) == 0
             default:
                 return false
+        }
+    }
+
+    /**
+     Determine the subtype of the given object and produce an appropriate
+     debug string representation.
+     */
+    static func debuggerDescription(of object: ObjectRef) -> String
+    {
+        switch object.pointee.kind {
+            case .string:
+                let contents = String(cString: object.asStringRef().pointee.chars)
+                return "String(\(contents))"
         }
     }
 }
