@@ -214,9 +214,8 @@ extension Compiler
         let substring = lexeme[firstCharIndex..<lastCharIndex]
 
         let stringObject = substring.withCStringBuffer { (chars) -> StringRef in
-            let terminatedSize = MemoryLayout<CStr.Element>.size * (chars.count + 1)
-            let buf = self.allocator.allocateBuffer(of: CStr.Element.self, size: terminatedSize)
-            let obj = self.allocator.allocateObject(ObjectString.self, kind: .string)
+            let buf = self.allocator.allocateBuffer(of: CStr.Element.self, size: chars.count)
+            let obj = self.allocator.allocateObject(ObjectString.self)
             return StringRef.initialize(obj, copying: chars, into: buf)
         }
 
@@ -396,7 +395,7 @@ private extension Token
 private extension StringProtocol {
     func withCStringBuffer<Result>(_ body: (ConstCStr) -> Result) -> Result {
         self.withCString { (chars) -> Result in
-            body(ConstCStr(start: chars, count: self.utf8.count))
+            body(ConstCStr(start: chars, count: self.utf8.count + 1))
         }
     }
 }

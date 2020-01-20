@@ -134,10 +134,10 @@ extension VM
         let finalLength = leftString.length + rightString.length + 1
         let concatenated = self.allocator.allocateBuffer(of: CStr.Element.self, size: finalLength)
         memcpy(concatenated.baseAddress, leftString.chars, leftString.length)
-        memcpy(concatenated.baseAddress! + leftString.length - 1, rightString.chars, rightString.length)
+        memcpy(concatenated.baseAddress! + leftString.length, rightString.chars, rightString.length)
         concatenated[finalLength - 1] = 0x0
 
-        let obj = self.allocator.allocateObject(ObjectString.self, kind: .string)
+        let obj = self.allocator.allocateObject(ObjectString.self)
         let result = StringRef.initialize(obj, takingChars: concatenated).asBaseRef()
         self.stack.push(.object(result))
     }

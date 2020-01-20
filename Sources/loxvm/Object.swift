@@ -27,7 +27,7 @@ extension StringRef
     static func initialize(_ allocation: StringRef, takingChars utf8: CStr) -> StringRef
     {
         allocation.pointee.chars = utf8.baseAddress!
-        allocation.pointee.length = utf8.count
+        allocation.pointee.length = utf8.count - 1
         return allocation
     }
 
@@ -36,12 +36,10 @@ extension StringRef
      initialized, copy the given characters into the provided buffer and finish initialization
      of the `ObjectString`.
      */
-    static func initialize(_ allocation: StringRef, copying lexeme: ConstCStr, into buffer: CStr) -> StringRef
+    static func initialize(_ allocation: StringRef, copying terminatedLexeme: ConstCStr, into buffer: CStr) -> StringRef
     {
-        let stringLength = lexeme.count + 1
-        assert(buffer.count == stringLength)
-        memcpy(buffer.baseAddress, lexeme.baseAddress, lexeme.count)
-        buffer[lexeme.count] = 0x0
+        assert(buffer.count == terminatedLexeme.count)
+        memcpy(buffer.baseAddress, terminatedLexeme.baseAddress, terminatedLexeme.count)
         return self.initialize(allocation, takingChars: buffer)
     }
 
