@@ -213,13 +213,13 @@ extension Compiler
         let lastCharIndex = lexeme.index(lexeme.endIndex, offsetBy: -1)
         let substring = lexeme[firstCharIndex..<lastCharIndex]
 
-        let stringObject = substring.withCStringBuffer { (chars) -> StringRef in
-            let buf = self.allocator.allocateBuffer(of: CStr.Element.self, size: chars.count)
-            let obj = self.allocator.allocateObject(ObjectString.self)
-            return StringRef.initialize(obj, copying: chars, into: buf)
+        let object: StringRef = substring.withCStringBuffer { (cString) in
+            let chars = self.allocator.allocateBuffer(of: CChar.self, count: cString.count)
+            memcpy(chars.baseAddress!, cString.baseAddress!, cString.count)
+            return self.allocator.allocateString(chars: chars)
         }
 
-        self.emitConstant(value: .object(stringObject.asBaseRef()))
+        self.emitConstant(value: .object(object.asBaseRef()))
     }
 
     //MARK:- Chunk handling
@@ -392,8 +392,15 @@ private extension Token
     }
 }
 
-private extension StringProtocol {
-    func withCStringBuffer<Result>(_ body: (ConstCStr) -> Result) -> Result {
+private extension StringProtocol
+{
+    /**
+     Invoke `body` with a buffer pointer to the NUL-terminated UTF-8 contents
+     of the string.
+     - remark: The buffer's `count` includes the NUL character.
+     */
+    func withCStringBuffer<Result>(_ body: (ConstCStr) -> Result) -> Result
+    {
         self.withCString { (chars) -> Result in
             body(ConstCStr(start: chars, count: self.utf8.count + 1))
         }

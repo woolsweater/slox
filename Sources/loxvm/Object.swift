@@ -3,6 +3,33 @@ import loxvm_object
 typealias CStr = UnsafeMutableBufferPointer<Int8>
 typealias ConstCStr = UnsafeBufferPointer<Int8>
 
+/**
+ One of the C structs in loxvm_object that "inherits"
+ from `Object`.
+ */
+protocol LoxObjectType
+{
+    /** The tag for this object type. */
+    static var kind: ObjectKind { get }
+    /** The bookkeeping data common to all objects. */
+    var header: Object { get set }
+}
+
+extension UnsafeMutablePointer where Pointee : LoxObjectType
+{
+    /** "Cast" a specific object pointer to a generic `ObjectRef`. */
+    func asBaseRef() -> ObjectRef
+    {
+        let raw = UnsafeMutableRawPointer(self)
+        return raw.assumingMemoryBound(to: Object.self)
+    }
+}
+
+extension ObjectString : LoxObjectType
+{
+    static let kind: ObjectKind = .string
+}
+
 extension ObjectRef
 {
     /**
@@ -21,32 +48,12 @@ extension ObjectRef
 extension StringRef
 {
     /**
-     Given a chunk of memory, sized for an `ObjectString` and whose `header` is already
-     initialized, configure it to also own the given character buffer.
+     Given a `StringRef` whose `header` is already initialized, configure
+     it to also own the given character buffer.
      */
-    static func initialize(_ allocation: StringRef, takingChars utf8: CStr) -> StringRef
+    func initialize(with chars: CStr)
     {
-        allocation.pointee.chars = utf8.baseAddress!
-        allocation.pointee.length = utf8.count - 1
-        return allocation
-    }
-
-    /**
-     Given a chunk of memory, sized for an `ObjectString` and whose `header` is already
-     initialized, copy the given characters into the provided buffer and finish initialization
-     of the `ObjectString`.
-     */
-    static func initialize(_ allocation: StringRef, copying terminatedLexeme: ConstCStr, into buffer: CStr) -> StringRef
-    {
-        assert(buffer.count == terminatedLexeme.count)
-        memcpy(buffer.baseAddress, terminatedLexeme.baseAddress, terminatedLexeme.count)
-        return self.initialize(allocation, takingChars: buffer)
-    }
-
-    /** "Cast" a `StringRef` to an `ObjectRef`. */
-    func asBaseRef() -> ObjectRef
-    {
-        let raw = UnsafeMutableRawPointer(self)
-        return raw.assumingMemoryBound(to: Object.self)
+        self.pointee.chars = chars.baseAddress!
+        self.pointee.length = chars.count - 1
     }
 }

@@ -29,29 +29,41 @@ class MemoryManager
     }
 
     /**
-     Acquire a piece of memory to hold a value of the given type, which must
-     be an `Object` subtype.
+     Allocate and initialize a Lox string that owns the given buffer of chars.
      */
-    func allocateObject<T>(_ objectType: T.Type, kind: ObjectKind) -> UnsafeMutablePointer<T>
+    func allocateString(chars: CStr) -> StringRef
     {
-        let allocation = self.reallocate(nil, oldSize: 0, newSize: MemoryLayout<T>.size)!
-        let obj = allocation.bindMemory(to: Object.self, capacity: 1)
-        obj.pointee.next = self.rootObject
-        obj.pointee.kind = kind
-        self.rootObject = obj
-        return allocation.bindMemory(to: T.self, capacity: 1)
+        let string = self.allocateObject(ObjectString.self)
+        string.initialize(with: chars)
+        return string
     }
 
     /**
-     Allocate a buffer that can hold `size` objects of the given `type`.
+     Allocate a buffer that can hold `count` objects of the given `type`.
      - precondition: `size` should be positive
      */
-    func allocateBuffer<T>(of type: T.Type, size: Int) -> UnsafeMutableBufferPointer<T>
+    func allocateBuffer<T>(of type: T.Type, count: Int) -> UnsafeMutableBufferPointer<T>
     {
-        precondition(size > 0)
+        precondition(count > 0)
+        let size = count * MemoryLayout<T>.stride
         let raw = self.reallocate(nil, oldSize: 0, newSize: size)!
-        let base = raw.bindMemory(to: T.self, capacity: size)
-        return UnsafeMutableBufferPointer<T>(start: base, count: size)
+        let base = raw.bindMemory(to: T.self, capacity: count)
+        return UnsafeMutableBufferPointer<T>(start: base, count: count)
+    }
+
+    /**
+     Acquire a piece of memory to hold a value of the given type, which must
+     be an `Object` subtype.
+     */
+    private func allocateObject<T>(_ objectType: T.Type) -> UnsafeMutablePointer<T>
+        where T : LoxObjectType
+    {
+        let allocation = self.reallocate(nil, oldSize: 0, newSize: MemoryLayout<T>.size)!
+        let obj = allocation.bindMemory(to: T.self, capacity: 1)
+        obj.pointee.header.next = self.rootObject
+        obj.pointee.header.kind = T.kind
+        self.rootObject = obj.asBaseRef()
+        return obj
     }
 
     /** Walk the list of allocated objects and free them and their payloads. */
