@@ -49,18 +49,20 @@ extension StringRef
 {
     var chars: UnsafeMutablePointer<CChar>
     {
-        return __ObjectString_chars(self)
+        __StringRef_chars(self)
     }
 
     /**
      Given a `StringRef` whose `header` is already initialized, copy
      the given C string into its `chars` allocation.
+     - r
      */
     func initialize(copying chars: ConstCStr)
     {
-        // `chars.count` includes NUL
-        memcpy(self.chars, chars.baseAddress!, chars.count)
+        precondition(chars.baseAddress != nil && chars.count > 0)
         self.pointee.length = chars.count - 1
+        // `chars.count` includes the NUL
+        self.chars.assign(from: chars.baseAddress!, count: chars.count)
     }
 
     /**
@@ -69,10 +71,22 @@ extension StringRef
      */
     func concatenate(_ left: StringRef, _ right: StringRef)
     {
-        memcpy(self.chars, left.chars, left.pointee.length)
-        memcpy(self.chars + left.pointee.length, right.chars, right.pointee.length)
-        let unterminatedLength = left.pointee.length + right.pointee.length
-        self.chars[unterminatedLength] = 0x0
+        let leftLength = left.pointee.length
+        let rightLength = right.pointee.length
+        let unterminatedLength = leftLength + rightLength
+
+        self.chars.copyChars(from: left)
+        self.chars.advanced(by: leftLength).copyChars(from: right)
         self.pointee.length = unterminatedLength
+        self.chars[unterminatedLength] = 0x0
+    }
+}
+
+extension UnsafeMutablePointer where Pointee == CChar
+{
+    func copyChars(from string: StringRef)
+    {
+        self.assign(from: string.chars,
+                    count: string.pointee.length)
     }
 }

@@ -1,10 +1,10 @@
 #include <stdlib.h>
 
-#define LOX_ENUM(TYPE) enum __attribute__((enum_extensibility(closed))) : TYPE
-#define LOX_REFINED_FOR_SWIFT __attribute__((swift_private))
-
 #ifndef LOXVM_OBJECT_H
 #define LOXVM_OBJECT_H
+
+#define LOX_ENUM(TYPE) enum __attribute__((enum_extensibility(closed))) : TYPE
+#define LOX_REFINED_FOR_SWIFT __attribute__((swift_private))
 
 #pragma clang assume_nonnull begin
 
@@ -12,7 +12,7 @@
  Tag to distinguish different object subtypes, which each have
  their own associated data.
  */
-typedef LOX_ENUM(uint32_t) {
+typedef LOX_ENUM(uint8_t) {
 
     /** A Lox String */
     ObjectKindString = 1,
@@ -65,7 +65,7 @@ typedef ObjectString * StringRef;
  if it is declared with 0 length.
  https://bugs.swift.org/browse/SR-12088
  */
-int8_t * ObjectString_chars(StringRef string)
+int8_t * StringRef_chars(StringRef string)
     LOX_REFINED_FOR_SWIFT;
 
 #pragma clang assume_nonnull end
