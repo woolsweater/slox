@@ -47,13 +47,32 @@ extension ObjectRef
 
 extension StringRef
 {
-    /**
-     Given a `StringRef` whose `header` is already initialized, configure
-     it to also own the given character buffer.
-     */
-    func initialize(with chars: CStr)
+    var chars: UnsafeMutablePointer<CChar>
     {
-        self.pointee.chars = chars.baseAddress!
+        return __ObjectString_chars(self)
+    }
+
+    /**
+     Given a `StringRef` whose `header` is already initialized, copy
+     the given C string into its `chars` allocation.
+     */
+    func initialize(copying chars: ConstCStr)
+    {
+        // `chars.count` includes NUL
+        memcpy(self.chars, chars.baseAddress!, chars.count)
         self.pointee.length = chars.count - 1
+    }
+
+    /**
+     Given a `StringRef` whose `header` is initialized, copy the contents of
+     the two Lox strings into its `chars` allocation.
+     */
+    func concatenate(_ left: StringRef, _ right: StringRef)
+    {
+        memcpy(self.chars, left.chars, left.pointee.length)
+        memcpy(self.chars + left.pointee.length, right.chars, right.pointee.length)
+        let unterminatedLength = left.pointee.length + right.pointee.length
+        self.chars[unterminatedLength] = 0x0
+        self.pointee.length = unterminatedLength
     }
 }

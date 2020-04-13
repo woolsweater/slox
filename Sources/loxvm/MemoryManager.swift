@@ -29,12 +29,27 @@ class MemoryManager
     }
 
     /**
-     Allocate and initialize a Lox string that owns the given buffer of chars.
+     Allocate and initialize a Lox string, copying the given C string into the
+     `chars` segment of the allocation.
      */
-    func allocateString(chars: CStr) -> StringRef
+    func createString(copying chars: ConstCStr) -> StringRef
     {
-        let string = self.allocateObject(ObjectString.self)
-        string.initialize(with: chars)
+        let string = self.createObject(ObjectString.self,
+                                       trailingSize: chars.count)
+        string.initialize(copying: chars)
+        return string
+    }
+
+    /**
+     Allocate and initialize a Lox string, copying the contents of the two
+     strings into the new string's `chars` buffer.
+     */
+    func createString(concatenating left: StringRef, _ right: StringRef) -> StringRef
+    {
+        let unterminatedLength = left.pointee.length + right.pointee.length
+        let string = self.createObject(ObjectString.self,
+                                       trailingSize: unterminatedLength + 1)
+        string.concatenate(left, right)
         return string
     }
 
@@ -53,15 +68,19 @@ class MemoryManager
 
     /**
      Acquire a piece of memory to hold a value of the given type, which must
-     be an `Object` subtype.
+     be an `Object` subtype, plus any required trailing member space, and
+     initialize its `header`.
      */
-    private func allocateObject<T>(_ objectType: T.Type) -> UnsafeMutablePointer<T>
-        where T : LoxObjectType
+    private func createObject<T>(_ objectType: T.Type, trailingSize: Int = 0)
+        -> UnsafeMutablePointer<T> where T : LoxObjectType
     {
-        let allocation = self.reallocate(nil, oldSize: 0, newSize: MemoryLayout<T>.size)!
-        let obj = allocation.bindMemory(to: T.self, capacity: 1)
+        let size = MemoryLayout<T>.size + trailingSize
+        guard let allocation = self.reallocate(nil, oldSize: 0, newSize: size) else {
+            fatalError("Failed allocation for '\(T.self)' instance")
+        }
+        let obj = allocation.bindMemory(to: objectType, capacity: 1)
         obj.pointee.header.next = self.rootObject
-        obj.pointee.header.kind = T.kind
+        obj.pointee.header.kind = objectType.kind
         self.rootObject = obj.asBaseRef()
         return obj
     }
@@ -74,8 +93,8 @@ class MemoryManager
             switch object.pointee.kind {
                 case .string:
                     let string = object.asStringRef().pointee
-                    self.freeAllocation(string.chars, size: string.length + 1)
-                    self.freeAllocation(object, size: MemoryLayout<ObjectString>.size)
+                    let size = MemoryLayout<ObjectString>.size + string.length + 1
+                    self.freeAllocation(object, size: size)
             }
         }
         self.rootObject = nil

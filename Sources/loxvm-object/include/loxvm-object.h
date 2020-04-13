@@ -1,9 +1,12 @@
 #include <stdlib.h>
 
+#define LOX_ENUM(TYPE) enum __attribute__((enum_extensibility(closed))) : TYPE
+#define LOX_REFINED_FOR_SWIFT __attribute__((swift_private))
+
 #ifndef LOXVM_OBJECT_H
 #define LOXVM_OBJECT_H
 
-#define LOX_ENUM(TYPE) enum __attribute__((enum_extensibility(closed))) : TYPE
+#pragma clang assume_nonnull begin
 
 /**
  Tag to distinguish different object subtypes, which each have
@@ -37,8 +40,13 @@ typedef struct {
     Object header;
     /** strlen of the `chars` buffer, i.e., not counting the NUL */
     size_t length;
-    /** NUL-terminated UTF-8 contents of the string. */
-    int8_t * _Nonnull chars;
+    /**
+     NUL-terminated UTF-8 contents of the string.
+     - remark: This is a flexible array member and will have a size
+     determined at runtime, but it must have a declared size in order
+     to be imported into Swift.
+    */
+    int8_t chars[0];
 } ObjectString;
 
 /**
@@ -49,5 +57,17 @@ typedef Object * ObjectRef;
 
 /** A heap-allocated `ObjectString`. */
 typedef ObjectString * StringRef;
+
+/**
+ Given a pointer to an `ObjectString`, return a pointer to its
+ `chars` field.
+ - remark: Swift code cannot calculate the offset of the field
+ if it is declared with 0 length.
+ https://bugs.swift.org/browse/SR-12088
+ */
+int8_t * ObjectString_chars(StringRef string)
+    LOX_REFINED_FOR_SWIFT;
+
+#pragma clang assume_nonnull end
 
 #endif /* LOXVM_OBJECT_H */

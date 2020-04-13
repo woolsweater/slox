@@ -211,12 +211,10 @@ extension Compiler
         // Drop quote marks
         let firstCharIndex = lexeme.index(after: lexeme.startIndex)
         let lastCharIndex = lexeme.index(lexeme.endIndex, offsetBy: -1)
-        let substring = lexeme[firstCharIndex..<lastCharIndex]
+        let contents = lexeme[firstCharIndex..<lastCharIndex]
 
-        let object: StringRef = substring.withCStringBuffer { (cString) in
-            let chars = self.allocator.allocateBuffer(of: CChar.self, count: cString.count)
-            memcpy(chars.baseAddress!, cString.baseAddress!, cString.count)
-            return self.allocator.allocateString(chars: chars)
+        let object: StringRef = contents.withCStringBuffer { (chars) in
+            self.allocator.createString(copying: chars)
         }
 
         self.emitConstant(value: .object(object.asBaseRef()))
@@ -401,7 +399,7 @@ private extension StringProtocol
      */
     func withCStringBuffer<Result>(_ body: (ConstCStr) -> Result) -> Result
     {
-        self.withCString { (chars) -> Result in
+        return self.withCString { (chars) -> Result in
             body(ConstCStr(start: chars, count: self.utf8.count + 1))
         }
     }

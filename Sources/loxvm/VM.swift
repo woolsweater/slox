@@ -116,32 +116,25 @@ extension VM
         }
     }
 
+    private struct BinaryOperandError : Error {}
+
     private func concatenate() throws
     {
         guard
-            case let .object(right) = self.stack.peek(), right.pointee.kind == .string,
-            case let .object(left) = self.stack.peek(distance: 1), left.pointee.kind == .string else
+            self.stack.peek().isObject(kind: .string),
+            self.stack.peek(distance: 1).isObject(kind: .string) else
         {
             self.reportRuntimeError("Operands must both be strings")
             throw BinaryOperandError()
         }
 
-        _ = self.stack.pop()
-        _ = self.stack.pop()
+        let right = self.stack.pop().object!.asStringRef()
+        let left = self.stack.pop().object!.asStringRef()
 
-        let leftString = left.asStringRef().pointee
-        let rightString = right.asStringRef().pointee
-        let finalLength = leftString.length + rightString.length + 1
-        let concatenated = self.allocator.allocateBuffer(of: CStr.Element.self, count: finalLength)
-        memcpy(concatenated.baseAddress, leftString.chars, leftString.length)
-        memcpy(concatenated.baseAddress! + leftString.length, rightString.chars, rightString.length)
-        concatenated[finalLength - 1] = 0x0
+        let result = self.allocator.createString(concatenating: left, right)
 
-        let object = self.allocator.allocateString(chars: concatenated)
-        self.stack.push(.object(object.asBaseRef()))
+        self.stack.push(.object(result.asBaseRef()))
     }
-
-    private struct BinaryOperandError : Error {}
 
     private func performBinaryOp<T>(_ operation: (Double, Double) -> T, wrapper: (T) -> Value) throws
     {

@@ -22,7 +22,7 @@ struct RawStack<Element>
     mutating func push(_ value: Element)
     {
         assert(self.top < self.buffer.baseAddress! + self.buffer.endIndex)
-        self.top.pointee = value
+        self.top.initialize(to: value)
         self.top += 1
     }
 
@@ -31,7 +31,7 @@ struct RawStack<Element>
     {
         assert(self.top > self.buffer.baseAddress!)
         self.top -= 1
-        return self.top.pointee
+        return self.top.move()
     }
 
     /** Return the value at the given distance from the top of the stack, keeping it in place. */

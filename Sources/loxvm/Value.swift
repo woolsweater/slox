@@ -18,7 +18,7 @@ extension Value : CustomDebugStringConvertible
             case .nil: return "nil"
             case let .number(value): return "number(\(value))"
             case let .object(obj):
-                return ObjectRef.debuggerDescription(of: obj)
+                return ObjectRef.debugDescription(of: obj)
         }
     }
 }
@@ -39,6 +39,21 @@ extension Value
             default:
                 return false
         }
+    }
+
+    /** Whether this value wraps an object of the given type */
+    func isObject(kind: ObjectKind) -> Bool
+    {
+        return self.object?.pointee.kind == kind
+    }
+
+    /** If this value is an object, the wrapped `ObjectRef`, else `nil` */
+    var object: ObjectRef?
+    {
+        guard case let .object(obj) = self else {
+            return nil
+        }
+        return obj
     }
 }
 
@@ -71,10 +86,10 @@ extension ObjectRef
     {
         switch (lhs.pointee.kind, rhs.pointee.kind) {
             case (.string, .string):
-                let left = lhs.asStringRef().pointee
-                let right = rhs.asStringRef().pointee
-                return left.length == right.length &&
-                    memcmp(left.chars, right.chars, left.length) == 0
+                let left = lhs.asStringRef()
+                let right = rhs.asStringRef()
+                return left.pointee.length == right.pointee.length &&
+                    0 == memcmp(left.chars, right.chars, left.pointee.length)
             default:
                 return false
         }
@@ -84,11 +99,11 @@ extension ObjectRef
      Determine the subtype of the given object and produce an appropriate
      debug string representation.
      */
-    static func debuggerDescription(of object: ObjectRef) -> String
+    static func debugDescription(of object: ObjectRef) -> String
     {
         switch object.pointee.kind {
             case .string:
-                let contents = String(cString: object.asStringRef().pointee.chars)
+                let contents = String(cString: object.asStringRef().chars)
                 return "String(\(contents))"
         }
     }
