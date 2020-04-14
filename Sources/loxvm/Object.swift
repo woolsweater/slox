@@ -73,16 +73,16 @@ extension StringRef
     {
         let leftLength = left.pointee.length
         let rightLength = right.pointee.length
-        let unterminatedLength = leftLength + rightLength
+        let length = leftLength + rightLength
 
         self.chars.copyChars(from: left)
         self.chars.advanced(by: leftLength).copyChars(from: right)
-        self.pointee.length = unterminatedLength
-        self.chars[unterminatedLength] = 0x0
+        self.pointee.length = length
+        self.chars[length] = 0x0
     }
 }
 
-extension UnsafeMutablePointer where Pointee == CChar
+private extension UnsafeMutablePointer where Pointee == CChar
 {
     func copyChars(from string: StringRef)
     {
