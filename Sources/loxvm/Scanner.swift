@@ -51,7 +51,7 @@ extension Scanner
 
         let char = self.readNext()
 
-        if char == "\"" {
+        if char == .doubleQuote {
             return self.readString()    // May return error token
         }
         else if char.isDigit {
@@ -213,9 +213,13 @@ extension Scanner
      */
     private func readString() -> Token
     {
-        while let char = self.peek(), char != "\"" {
+        while let char = self.peek(), char != .doubleQuote {
             if char == "\n" {
                 self.lineNumber += 1
+            }
+            else if (char, self.peekAfter()) == (.backslash, .doubleQuote) {
+                // Consume the escaped quote so it doesn't end the loop
+                self.advanceIndex()
             }
             self.advanceIndex()
         }
@@ -371,4 +375,7 @@ private extension Character
         if self.isDigit { return false }
         return CharacterSet.loxIdentifiers.contains(self.unicodeScalars.first!)
     }
+
+    static let backslash: Character = #"\"#
+    static let doubleQuote: Character = "\""
 }

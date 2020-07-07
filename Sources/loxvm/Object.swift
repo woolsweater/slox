@@ -55,7 +55,6 @@ extension StringRef
     /**
      Given a `StringRef` whose `header` is already initialized, copy
      the given C string into its `chars` allocation.
-     - r
      */
     func initialize(copying chars: ConstCStr)
     {

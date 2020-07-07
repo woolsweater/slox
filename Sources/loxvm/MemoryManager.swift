@@ -63,7 +63,17 @@ class MemoryManager
         let size = count * MemoryLayout<T>.stride
         let raw = self.reallocate(nil, oldSize: 0, newSize: size)!
         let base = raw.bindMemory(to: T.self, capacity: count)
+        // Track these and error at shutdown for leaks?
         return UnsafeMutableBufferPointer<T>(start: base, count: count)
+    }
+
+    /**
+     Mark some memory that was previously obtained from `allocateBuffer` as unused.
+     */
+    func destroyBuffer<T>(_ buffer: UnsafeMutableBufferPointer<T>)
+    {
+        guard let pointer = buffer.baseAddress else { return }
+        self.freeAllocation(pointer, size: buffer.byteSize)
     }
 
     /**
@@ -137,4 +147,10 @@ private struct ObjectList : Sequence
     {
         return ObjectListIterator(first: self.first)
     }
+}
+
+private extension UnsafeMutableBufferPointer
+{
+    /** The size of the allocation contained in this buffer. */
+    var byteSize: Int { self.count * MemoryLayout<Element>.size }
 }

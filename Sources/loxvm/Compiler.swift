@@ -27,6 +27,7 @@ class Compiler
 
     private let scanner: Scanner
     private let allocator: MemoryManager
+    private lazy var stringCompiler = StringCompiler(allocator: self.allocator)
     private var currentToken: Token = .dummy
     private var previousToken: Token = .dummy
 
@@ -213,11 +214,25 @@ extension Compiler
         let lastCharIndex = lexeme.index(lexeme.endIndex, offsetBy: -1)
         let contents = lexeme[firstCharIndex..<lastCharIndex]
 
-        let object: StringRef = contents.withCStringBuffer { (chars) in
-            self.allocator.createString(copying: chars)
+        // We incur an unnecessary copy into a temporary here when the string has no
+        // escapes. This matches the Wren implementation (wren_compiler.c -> readString)
+        // so we won't worry about it for now. At some point, though, it would be good
+        // to compare the performance of scanning the string for backslashes first and
+        // skipping rendering if possible -- we'd get a pointer to the String's
+        // contents (`withCString`) and copy from that directly.
+        do {
+            let object = try self.stringCompiler.withRenderedEscapes(in: contents) {
+                self.allocator.createString(copying: $0)
+            }
+            self.emitConstant(value: .object(object.asBaseRef()))
         }
-
-        self.emitConstant(value: .object(object.asBaseRef()))
+        catch let error as StringEscapeError {
+            self.reportError(message: error.message)
+        }
+        catch {
+            assertionFailure("Unexpected error from string compilation: '\(error)'")
+            self.reportError(message: "Could not compile string contents: '\(error)'")
+        }
     }
 
     //MARK:- Chunk handling
@@ -387,20 +402,5 @@ private extension Token
     static var dummy: Token
     {
         return Token(kind: .EOF, lexeme: "not a token", lineNumber: -1)
-    }
-}
-
-private extension StringProtocol
-{
-    /**
-     Invoke `body` with a buffer pointer to the NUL-terminated UTF-8 contents
-     of the string.
-     - remark: The buffer's `count` includes the NUL character.
-     */
-    func withCStringBuffer<Result>(_ body: (ConstCStr) -> Result) -> Result
-    {
-        return self.withCString { (chars) -> Result in
-            body(ConstCStr(start: chars, count: self.utf8.count + 1))
-        }
     }
 }
