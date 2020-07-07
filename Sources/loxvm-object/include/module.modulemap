@@ -1,0 +1,4 @@
+module loxvm_object {
+    umbrella header "loxvm-object.h"
+    export *
+}
