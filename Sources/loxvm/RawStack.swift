@@ -6,16 +6,28 @@ import Foundation
  */
 struct RawStack<Element>
 {
+    //FIXME: We will need COW here if VM needs to move its stack around
+
     /** The underlying storage. */
     private let buffer: UnsafeMutableBufferPointer<Element>
     /** The location at which the next element will be stored. */
     private var top: UnsafeMutablePointer<Element>
 
     /** Create a stack that can hold `size` elements. */
-    init(size: Int)
+    init(size: Int, allocator: MemoryManager)
     {
-        self.buffer = .allocate(capacity: size)
+        self.buffer = allocator.allocateBuffer(count: size)
         self.top = buffer.baseAddress!
+    }
+
+    /**
+     Deinitialize and free the stack's allocation.
+     - warning: This leaves the stack in an unusable
+     and *unsafe* state.
+     */
+    func destroy(allocator: MemoryManager)
+    {
+        allocator.destroyBuffer(self.buffer)
     }
 
     /** Add a value to the top of the stack. */

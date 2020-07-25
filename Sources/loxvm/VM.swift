@@ -9,14 +9,28 @@ class VM
      */
     private static let stackMaxSize = 256
 
+    /** Creator and tracker for heap allocations. */
+    private let allocator = MemoryManager()
     /** The bytecode currently being interpreted. */
     private(set) var chunk: Chunk!
     /** Index into the bytecode. */
     private var ip: InstructionPointer!
     /** Storage space for values derived from interpretation. */
-    private var stack = RawStack<Value>(size: VM.stackMaxSize)
-    /** Creator and tracker for heap allocations. */
-    private let allocator = MemoryManager()
+    private var stack: RawStack<Value>
+    /** All unique string values known to this interpretation context. */
+    private var strings: Table
+
+    init()
+    {
+        self.stack = RawStack<Value>(size: VM.stackMaxSize, allocator: self.allocator)
+        self.strings = Table(allocator: self.allocator)
+    }
+
+    deinit
+    {
+        self.stack.destroy(allocator: self.allocator)
+        self.strings.deinitialize()
+    }
 }
 
 enum InterpretResult
@@ -235,7 +249,7 @@ private extension InstructionPointer
  */
 private func memcpy(_ dest: inout UInt32, _ src: InstructionPointer, _ count: Int)
 {
-    precondition(count <= dest.bitWidth)
+    precondition(count <= (dest.bitWidth / 8))
     withUnsafeMutableBytes(of: &dest) { (bytes) in
         for i in 0..<count {
             bytes[i] = src.code[src.address + i]

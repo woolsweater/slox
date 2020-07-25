@@ -62,6 +62,7 @@ extension StringRef
         self.pointee.length = chars.count - 1
         // `chars.count` includes the NUL
         self.chars.assign(from: chars.baseAddress!, count: chars.count)
+        self.initializeHash()
     }
 
     /**
@@ -78,6 +79,21 @@ extension StringRef
         self.chars.advanced(by: leftLength).copyChars(from: right)
         self.pointee.length = length
         self.chars[length] = 0x0
+        self.initializeHash()
+    }
+
+    /** Calculate and store the "FNV-1a" hash of the characters in the string */
+    private func initializeHash()
+    {
+        var hash: UInt32 = 2166136261
+
+        for byte in UnsafeBufferPointer(start: self.chars, count: self.pointee.length) {
+            let paddedByte = byte |> UInt8.init(bitPattern:) |> UInt32.init(_:)
+            hash ^= paddedByte
+            hash &*= 16777619
+        }
+
+        self.pointee.hash = hash
     }
 }
 

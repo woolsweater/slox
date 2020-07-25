@@ -41,6 +41,11 @@ typedef struct {
     /** strlen of the `chars` buffer, i.e., not counting the NUL */
     size_t length;
     /**
+     Lox-internal hash of the contents of the string.
+     Primarily used for variable lookup.
+     */
+    uint32_t hash;
+    /**
      NUL-terminated UTF-8 contents of the string.
      - remark: This is a flexible array member and will have a size
      determined at runtime, but it must have a declared size in order

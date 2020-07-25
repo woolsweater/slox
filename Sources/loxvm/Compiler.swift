@@ -212,8 +212,8 @@ extension Compiler
         let lexeme = self.previousToken.lexeme
         // Drop quote marks
         let firstCharIndex = lexeme.index(after: lexeme.startIndex)
-        let lastCharIndex = lexeme.index(lexeme.endIndex, offsetBy: -1)
-        let contents = lexeme[firstCharIndex..<lastCharIndex]
+        let endQuoteIndex = lexeme.index(lexeme.endIndex, offsetBy: -1)
+        let contents = lexeme[firstCharIndex..<endQuoteIndex]
 
         // We incur an unnecessary copy into a temporary here when the string has no
         // escapes. This matches the Wren implementation (wren_compiler.c -> readString)

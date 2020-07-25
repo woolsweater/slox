@@ -28,6 +28,16 @@ class MemoryManager
         }
     }
 
+    func reallocateBuffer<T>(_ previous: UnsafeMutableBufferPointer<T>?, newCount: Int) -> UnsafeMutableBufferPointer<T>?
+    {
+        let newSize = MemoryLayout<T>.size * newCount
+        let oldSize = MemoryLayout<T>.size * (previous?.count ?? 0)
+        let raw = self.reallocate(previous?.baseAddress, oldSize: oldSize, newSize: newSize)
+        let base = raw?.bindMemory(to: T.self, capacity: newCount)
+        // Track these and error at shutdown for leaks?
+        return base.flatMap({ UnsafeMutableBufferPointer(start: $0, count: newCount) })
+    }
+
     /**
      Allocate and initialize a Lox string, copying the given C string into the
      `chars` segment of the allocation.
@@ -56,15 +66,15 @@ class MemoryManager
     /**
      Allocate a buffer that can hold `count` objects of the given `type`.
      - precondition: `size` should be positive
+     - parameter type: The element type that will be stored in the buffer.
+     - parameter count: The desired capacity of the new buffer.
+     - returns: An *uninitialized* buffer large enough to hold `count` instances of
+     its element type.
      */
-    func allocateBuffer<T>(of type: T.Type, count: Int) -> UnsafeMutableBufferPointer<T>
+    func allocateBuffer<T>(of type: T.Type = T.self, count: Int) -> UnsafeMutableBufferPointer<T>
     {
         precondition(count > 0)
-        let size = count * MemoryLayout<T>.stride
-        let raw = self.reallocate(nil, oldSize: 0, newSize: size)!
-        let base = raw.bindMemory(to: T.self, capacity: count)
-        // Track these and error at shutdown for leaks?
-        return UnsafeMutableBufferPointer<T>(start: base, count: count)
+        return self.reallocateBuffer(nil, newCount: count)!
     }
 
     /**
@@ -73,6 +83,7 @@ class MemoryManager
     func destroyBuffer<T>(_ buffer: UnsafeMutableBufferPointer<T>)
     {
         guard let pointer = buffer.baseAddress else { return }
+        pointer.deinitialize(count: buffer.count)
         self.freeAllocation(pointer, size: buffer.byteSize)
     }
 
