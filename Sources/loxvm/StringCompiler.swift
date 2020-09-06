@@ -43,7 +43,7 @@ extension StringCompiler
     {
         let count = contents.cStringLength()
 
-        let result = self.allocator.allocateBuffer(of: UInt8.self, count: count)
+        let result = self.allocator.allocateBuffer(of: UInt8.self, count: count + 1)
         var currentDest = result.baseAddress!
 
         var currentSource = contents
