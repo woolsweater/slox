@@ -36,9 +36,18 @@ let package = Package(
             name: "loxvm-object",
             dependencies: []
         ),
+        .target(
+            name: "loxvm-testable",
+            dependencies: ["loxvm-object"],
+            exclude: ["main.swift"]
+        ),
         .testTarget(
             name: "LoxLibTests",
             dependencies: ["LoxLib"]
+        ),
+        .testTarget(
+            name: "loxvm-tests",
+            dependencies: ["loxvm-testable"]
         ),
     ]
 )

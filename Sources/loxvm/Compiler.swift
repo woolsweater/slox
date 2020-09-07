@@ -27,7 +27,8 @@ class Compiler
 
     private let scanner: Scanner
     private let allocator: MemoryManager
-    private lazy var stringCompiler = StringCompiler(allocator: self.allocator)
+    private lazy var stringCompiler = StringCompiler(allocate: { self.allocator.allocateBuffer(of: UInt8.self, count: $0) },
+                                                      destroy: { self.allocator.destroyBuffer($0) })
     private var currentToken: Token = .dummy
     private var previousToken: Token = .dummy
 

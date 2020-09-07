@@ -3,15 +3,20 @@ import Foundation
 /** String processing for the Lox `Compiler` */
 class StringCompiler
 {
-    private let allocator: MemoryManager
+    typealias Allocator = (Int) -> UnsafeMutableBufferPointer<UInt8>
+    typealias Deallocator = (UnsafeMutableBufferPointer<Int8>) -> Void
+
+    private let allocate: Allocator
+    private let destroy: Deallocator
 
     /**
-     Create a `StringCompiler` that will use the given `MemoryManager` to
-     acquire whatever memory it needs for processing.
+     Create a `StringCompiler` that will use the given functions to
+     acquire and destroy whatever memory it needs for processing.
      */
-    init(allocator: MemoryManager)
+    init(allocate: @escaping Allocator, destroy: @escaping Deallocator)
     {
-        self.allocator = allocator
+        self.allocate = allocate
+        self.destroy = destroy
     }
 }
 
@@ -31,7 +36,7 @@ extension StringCompiler
     {
         let processed = try s.withCString(encodedAs: UTF8.self,
                                           self.processString)
-        defer { self.allocator.destroyBuffer(processed.base) }
+        defer { self.destroy(processed.base) }
         return body(UnsafeBufferPointer(rebasing: processed))
     }
 
@@ -43,7 +48,7 @@ extension StringCompiler
     {
         let count = contents.cStringLength()
 
-        let result = self.allocator.allocateBuffer(of: UInt8.self, count: count + 1)
+        let result = self.allocate(count + 1)
         var currentDest = result.baseAddress!
 
         var currentSource = contents
@@ -72,7 +77,7 @@ extension StringCompiler
             let (encoded, encodedLength) = try codepoint.toUTF8()
 
             currentDest.appendContents(of: currentSource, through: nextEscape)
-            _ = withUnsafePointer(to: encoded) {
+            withUnsafePointer(to: encoded) {
                 memcpy(currentDest, UnsafeRawPointer($0), encodedLength)
                 currentDest += encodedLength
             }
