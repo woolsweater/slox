@@ -86,6 +86,9 @@ class StringCompilerRenderTests : XCTestCase
 
         try self.evaluateRendering(input: #"I visited a lovely pa\u0302;tisserie in \u1f1eb;\u001F1F7; with my whole \u001F469;\u200D;\u1F469;\u200D;\u001F467;\u200D;\u01F466;"#,
                                 expected: "I visited a lovely pâtisserie in 🇫🇷 with my whole 👩‍👩‍👧‍👦")
+
+        try self.evaluateRendering(input: #"Caffe\u300;"#,
+                                expected: "Caffè")
     }
 
     /**
@@ -105,7 +108,7 @@ class StringCompilerRenderTests : XCTestCase
     {
         try self.compiler.withRenderedEscapes(in: input[...]) {
             let rendered = String(cString: $0.baseAddress!)
-            XCTAssertEqual(expected, rendered)
+            XCTAssertEqual(rendered, expected)
         }
     }
 }

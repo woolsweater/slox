@@ -26,9 +26,10 @@ class Compiler
     private var state: State = .normal
 
     private let scanner: Scanner
+    private let strings: HashTable
     private let allocator: MemoryManager
-    private lazy var stringCompiler = StringCompiler(allocate: { self.allocator.allocateBuffer(of: UInt8.self, count: $0) },
-                                                      destroy: { self.allocator.destroyBuffer($0) })
+    private lazy var stringCompiler = StringCompiler(allocate: { [allocator] in allocator.allocateBuffer(of: UInt8.self, count: $0) },
+                                                      destroy: { [allocator] in allocator.destroyBuffer($0) })
     private var currentToken: Token = .dummy
     private var previousToken: Token = .dummy
 
@@ -38,9 +39,10 @@ class Compiler
      Create a compiler to operate on the given source, obtaining any neccessary heap memory
      from the provided allocator.
      */
-    init(source: String, allocator: MemoryManager)
+    init(source: String, stringsTable: HashTable, allocator: MemoryManager)
     {
         self.scanner = Scanner(source: source)
+        self.strings = stringsTable
         self.allocator = allocator
     }
 }
@@ -222,8 +224,16 @@ extension Compiler
         // skipping rendering if possible -- we'd get a pointer to the String's
         // contents (`withCString`) and copy from that directly.
         do {
-            let object = try self.stringCompiler.withRenderedEscapes(in: contents) {
-                self.allocator.createString(copying: $0)
+            let object: StringRef = try self.stringCompiler.withRenderedEscapes(in: contents) {
+                (rendered) in
+                if let existing = self.strings.findString(matching: rendered) {
+                    return existing
+                }
+                else {
+                    let new = self.allocator.createString(copying: rendered)
+                    self.strings.insert(.nil, for: new)
+                    return new
+                }
             }
             self.emitConstant(value: .object(object.asBaseRef()))
         }

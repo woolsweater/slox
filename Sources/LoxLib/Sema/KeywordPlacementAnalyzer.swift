@@ -108,7 +108,7 @@ class KeywordPlacementAnalyzer : SemanticAnalyzer
 
         let lastStatement = body.last
         if self.funcState.current == .getter {
-            guard case .return(_)? = lastStatement else {
+            guard case .return(_, _)? = lastStatement else {
                 throw SemanticError.missingReturn(at: name)
             }
         }

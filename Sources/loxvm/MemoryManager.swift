@@ -87,6 +87,23 @@ class MemoryManager
         self.freeAllocation(pointer, size: buffer.byteSize)
     }
 
+    func destroyObject<T>(_ object: UnsafeMutablePointer<T>) where T : LoxObjectType
+    {
+        guard let root = self.rootObject else { fatalError("This object cannot exist") }
+        let toDestroy = object.asBaseRef()
+        guard let previous = ObjectList(first: root).objectBefore(toDestroy) else {
+            fatalError("Nonexistence!")
+        }
+
+        previous.pointee.next = toDestroy.pointee.next
+        switch toDestroy.pointee.kind {
+            case .string:
+                let string = toDestroy.asStringRef().pointee
+                let size = MemoryLayout<ObjectString>.size + string.length + 1
+                self.freeAllocation(toDestroy, size: size)
+        }
+    }
+
     /**
      Acquire a piece of memory to hold a value of the given type, which must
      be an `Object` subtype, plus any required trailing member space, and
@@ -157,6 +174,11 @@ private struct ObjectList : Sequence
     func makeIterator() -> ObjectListIterator
     {
         return ObjectListIterator(first: self.first)
+    }
+
+    func objectBefore(_ object: ObjectRef) -> ObjectRef?
+    {
+        self.first(where: { $0.pointee.next == object })
     }
 }
 

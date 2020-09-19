@@ -51,7 +51,7 @@ class Interpreter
                 try self.evaluateClassDecl(name: name, superclass: superclass, methods: methods)
             case let .functionDecl(identifier: ident, parameters: parameters, body: body):
                 self.evaluateFunctionDecl(identifier: ident, parameters: parameters, body: body)
-            case .getterDecl(_):
+            case .getterDecl(_, _):
                 // The Parser should not have produced a top-level .getterDecl
                 fatalError("Getter decl should only be present in a class body")
             case let .variableDecl(name: name, initializer: expression):

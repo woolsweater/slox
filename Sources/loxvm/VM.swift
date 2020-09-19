@@ -10,7 +10,7 @@ class VM
     private static let stackMaxSize = 256
 
     /** Creator and tracker for heap allocations. */
-    private let allocator = MemoryManager()
+    private let allocator: MemoryManager
     /** The bytecode currently being interpreted. */
     private(set) var chunk: Chunk!
     /** Index into the bytecode. */
@@ -18,12 +18,15 @@ class VM
     /** Storage space for values derived from interpretation. */
     private var stack: RawStack<Value>
     /** All unique string values known to this interpretation context. */
-    private var strings: Table
+    private var strings: HashTable
 
     init()
     {
-        self.stack = RawStack<Value>(size: VM.stackMaxSize, allocator: self.allocator)
-        self.strings = Table(allocator: self.allocator)
+        let allocator = MemoryManager()
+        self.allocator = allocator
+        self.stack = RawStack<Value>(size: VM.stackMaxSize, allocator: allocator)
+        self.strings = HashTable(allocator: { allocator.allocateBuffer(of: HashTable.Buffer.Element.self, count: $0) },
+                                 deallocator: { allocator.destroyBuffer($0) })
     }
 
     deinit
@@ -45,7 +48,7 @@ extension VM
     /** Interpret the given source code, reporting whether an error occurred. */
     func interpret(source: String) -> InterpretResult
     {
-        let compiler = Compiler(source: source, allocator: self.allocator)
+        let compiler = Compiler(source: source, stringsTable: self.strings, allocator: self.allocator)
         guard let compiledChunk = compiler.compile() else {
             return .compileError
         }
@@ -145,9 +148,19 @@ extension VM
         let right = self.stack.pop().object!.asStringRef()
         let left = self.stack.pop().object!.asStringRef()
 
-        let result = self.allocator.createString(concatenating: left, right)
+        let concatenated = self.allocator.createString(concatenating: left, right)
 
-        self.stack.push(.object(result.asBaseRef()))
+        let string: StringRef
+        if let interned = self.strings.findString(matching: concatenated) {
+            self.allocator.destroyObject(concatenated)
+            string = interned
+        }
+        else {
+            self.strings.insert(.nil, for: concatenated)
+            string = concatenated
+        }
+
+        self.stack.push(.object(string.asBaseRef()))
     }
 
     private func performBinaryOp<T>(_ operation: (Double, Double) -> T, wrapper: (T) -> Value) throws
