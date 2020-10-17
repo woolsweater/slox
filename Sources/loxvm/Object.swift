@@ -62,7 +62,7 @@ extension StringRef
         self.pointee.length = chars.count - 1
         // `chars.count` includes the NUL
         self.chars.assign(from: chars.baseAddress!, count: chars.count)
-        self.pointee.hash = loxHash(self.chars, length: self.pointee.length)
+        self.pointee.hash = loxHash(self.chars, stringLength: self.pointee.length)
     }
 
     /**
@@ -79,7 +79,7 @@ extension StringRef
         self.chars.advanced(by: leftLength).copyChars(from: right)
         self.pointee.length = length
         self.chars[length] = 0x0
-        self.pointee.hash = loxHash(self.chars, length: self.pointee.length)
+        self.pointee.hash = loxHash(self.chars, stringLength: self.pointee.length)
     }
 }
 

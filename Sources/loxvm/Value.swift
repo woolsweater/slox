@@ -86,10 +86,8 @@ extension ObjectRef
     {
         switch (lhs.pointee.kind, rhs.pointee.kind) {
             case (.string, .string):
-                let left = lhs.asStringRef()
-                let right = rhs.asStringRef()
-                return left.pointee.length == right.pointee.length &&
-                    0 == memcmp(left.chars, right.chars, left.pointee.length)
+                // All strings are uniqued and interned by the Compiler
+                return lhs == rhs
             default:
                 return false
         }
