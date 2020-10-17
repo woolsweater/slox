@@ -48,7 +48,7 @@ let package = Package(
         ),
         .testTarget(
             name: "loxvm-tests",
-            dependencies: ["loxvm-testable"]
+            dependencies: ["loxvm", "loxvm-testable"]
         ),
     ]
 )

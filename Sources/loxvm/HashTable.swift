@@ -67,6 +67,8 @@ extension HashTable
     /**
      Look for a key whose contents are equal to the given
      characters, returning it if it exists in the table.
+     - remark: This can be used _before_ creating a new `StringRef`
+     and storing it in the table to ensure that it is unique.
      */
     func findString(matching chars: ConstCStr) -> StringRef?
     {
@@ -126,6 +128,15 @@ extension HashTable
         }
 
         slot.pointee = .live(key: key, value: value)
+    }
+
+    /**
+     Add the given string to the table as a new key that is
+     known to be unique. `.nil` is stored as the value.
+     */
+    func internString(_ string: StringRef)
+    {
+        self.insert(.nil, for: string)
     }
 
     /** Remove the entry for `key` from the table, if it is present. */
@@ -199,7 +210,7 @@ private extension HashTable.Buffer
     typealias Slot = UnsafeMutablePointer<Element>
 
     /**
-     Locate the expected location in the buffer for the given key's hash,
+     Locate the expected slot in the buffer for the given key's hash,
      then, if it is not there, probe forward until either we find it or
      hit an empty slot.
      If the desired key is found, its slot is returned. Otherwise,
@@ -233,6 +244,13 @@ private extension HashTable.Buffer
         return tombstoneSlot ?? self.slot(at: index)
     }
 
+    /**
+     Check whether a `StringRef` already exists in the table with the
+     given contents. The character buffer's hash is passed for convenience
+     in the comparison step.
+     - returns: The `StringRef` with contents identical to the passed
+     characters, or `nil` if no such entry exists.
+     */
     func findString(matching chars: ConstCStr, with hash: UInt32) -> StringRef?
     {
         var index = Int(hash) % self.count
@@ -240,7 +258,7 @@ private extension HashTable.Buffer
             defer { index = self.wrappingIndex(after: index) }
             guard case let .live(key, _) = entry else { continue }
 
-            if key.matches(chars, hash) {
+            if key.matches(chars, and: hash) {
                 return key
             }
         }
@@ -265,7 +283,13 @@ private extension HashTable.Buffer
 
 private extension StringRef
 {
-    func matches(_ chars: ConstCStr, _ hash: UInt32) -> Bool
+    /**
+     Compare this `StringRef` for equivalence with a character buffer/hash
+     pair.
+     - remark: Easy comparisons first: length and hash; actual
+     byte-by-byte equality is only checked if those pass.
+     */
+    func matches(_ chars: ConstCStr, and hash: UInt32) -> Bool
     {
         return self.pointee.length == (chars.count - 1) &&
             self.pointee.hash == hash &&
