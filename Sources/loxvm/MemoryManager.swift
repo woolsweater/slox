@@ -30,8 +30,8 @@ class MemoryManager
 
     func reallocateBuffer<T>(_ previous: UnsafeMutableBufferPointer<T>?, newCount: Int) -> UnsafeMutableBufferPointer<T>?
     {
-        let newSize = MemoryLayout<T>.size * newCount
-        let oldSize = MemoryLayout<T>.size * (previous?.count ?? 0)
+        let newSize = MemoryLayout<T>.stride * newCount
+        let oldSize = MemoryLayout<T>.stride * (previous?.count ?? 0)
         let raw = self.reallocate(previous?.baseAddress, oldSize: oldSize, newSize: newSize)
         let base = raw?.bindMemory(to: T.self, capacity: newCount)
         // Track these and error at shutdown for leaks?
@@ -185,5 +185,5 @@ private struct ObjectList : Sequence
 private extension UnsafeMutableBufferPointer
 {
     /** The size of the allocation contained in this buffer. */
-    var byteSize: Int { self.count * MemoryLayout<Element>.size }
+    var byteSize: Int { self.count * MemoryLayout<Element>.stride }
 }
