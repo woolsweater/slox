@@ -21,8 +21,11 @@ class HashTable
         case tombstone
     }
 
+    /** The underlying storage for the table. */
     typealias Buffer = UnsafeMutableBufferPointer<Entry?>
+    /** A function that can allocate a new `Buffer` of the given capacity. */
     typealias Allocator = (Int) -> Buffer
+    /** A function that can destroy a `Buffer` */
     typealias Deallocator = (Buffer) -> Void
 
     /** The number of entries actually present in the table. */
@@ -45,16 +48,14 @@ class HashTable
     init(allocator: @escaping Allocator, deallocator: @escaping Deallocator)
     {
         self.count = 0
-        // `entries` will be filled lazily, on first insertion
+        // `entries` will be populated lazily, on first insertion
         self.entries = nil
         self.allocate = allocator
         self.deallocate = deallocator
     }
 
-    /**
-     Reset the table, removing all entries.
-     */
-    func deinitialize()
+    /** Reset the table, removing all entries. */
+    deinit
     {
         self.count = 0
         self.deallocate(self.entries)
@@ -172,13 +173,17 @@ extension HashTable
 
 private extension HashTable
 {
-    private static let maximumLoad = 0.75
-    private static let expansionFactor = 1.6
+    struct Size
+    {
+        static let minimumCapacity = 8
+        static let maximumLoad = 0.75
+        static let expansionFactor = 1.6
+    }
 
     private var capacity: Int { self.entries?.count ?? 0 }
-    private var maxiumumCount: Int { self.capacity.scaled(by: HashTable.maximumLoad) }
+    private var maxiumumCount: Int { self.capacity.scaled(by: Size.maximumLoad) }
     private var needsExpansionOnInsertion: Bool { self.count + 1 > self.maxiumumCount }
-    private var expandedCapacity: Int { max(8, self.capacity.scaled(by: HashTable.expansionFactor)) }
+    private var expandedCapacity: Int { max(Size.minimumCapacity, self.capacity.scaled(by: Size.expansionFactor)) }
 
     private func expand()
     {
@@ -308,6 +313,7 @@ private extension Int
 #if DEBUG
 extension HashTable
 {
+    /** Access in unit tests to the table's buffer */
     var buffer: Buffer { self.entries }
 }
 #endif

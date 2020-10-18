@@ -33,7 +33,7 @@ struct RawStack<Element>
     /** Add a value to the top of the stack. */
     mutating func push(_ value: Element)
     {
-        assert(self.top < self.buffer.baseAddress! + self.buffer.endIndex)
+        precondition(self.top < self.buffer.baseAddress! + self.buffer.endIndex)
         self.top.initialize(to: value)
         self.top += 1
     }
@@ -41,7 +41,7 @@ struct RawStack<Element>
     /** Remove and return the value at the top of the stack. */
     mutating func pop() -> Element
     {
-        assert(self.top > self.buffer.baseAddress!)
+        precondition(self.top > self.buffer.baseAddress!)
         self.top -= 1
         return self.top.move()
     }

@@ -26,13 +26,12 @@ class VM
         self.allocator = allocator
         self.stack = RawStack<Value>(size: VM.stackMaxSize, allocator: allocator)
         self.strings = HashTable(allocator: { allocator.allocateBuffer(of: HashTable.Buffer.Element.self, count: $0) },
-                                 deallocator: { allocator.destroyBuffer($0) })
+                               deallocator: { allocator.destroyBuffer($0) })
     }
 
     deinit
     {
         self.stack.destroy(allocator: self.allocator)
-        self.strings.deinitialize()
     }
 }
 

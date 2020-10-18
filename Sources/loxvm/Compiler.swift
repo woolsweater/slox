@@ -231,7 +231,7 @@ extension Compiler
                 }
                 else {
                     let new = self.allocator.createString(copying: rendered)
-                    self.strings.insert(.nil, for: new)
+                    self.strings.internString(new)
                     return new
                 }
             }
