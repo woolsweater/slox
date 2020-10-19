@@ -77,8 +77,9 @@ extension VM
             do {
                 switch opCode {
                     case .return:
-                        print(self.stack.pop())
                         return .okay
+                    case .print:
+                        print(self.stack.pop().formatted())
                     case .constant:
                         let offset = self.ip.advanceTakingInt()
                         let constant = self.chunk.constants[offset]
@@ -124,6 +125,8 @@ extension VM
                         try self.performBinaryOp(*, wrapper: Value.number)
                     case .divide:
                         try self.performBinaryOp(/, wrapper: Value.number)
+                    case .pop:
+                        _ = self.stack.pop()
                 }
             }
             catch {

@@ -9,20 +9,6 @@ enum Value
     case object(ObjectRef)
 }
 
-extension Value : CustomDebugStringConvertible
-{
-    var debugDescription: String
-    {
-        switch self {
-            case let .bool(value): return "bool(\(value))"
-            case .nil: return "nil"
-            case let .number(value): return "number(\(value))"
-            case let .object(obj):
-                return ObjectRef.debugDescription(of: obj)
-        }
-    }
-}
-
 extension Value
 {
     /**
@@ -41,12 +27,6 @@ extension Value
         }
     }
 
-    /** Whether this value wraps an object of the given type */
-    func isObject(kind: ObjectKind) -> Bool
-    {
-        return self.object?.pointee.kind == kind
-    }
-
     /** If this value is an object, the wrapped `ObjectRef`, else `nil` */
     var object: ObjectRef?
     {
@@ -54,6 +34,26 @@ extension Value
             return nil
         }
         return obj
+    }
+
+    /** Whether this value wraps an object of the given type */
+    func isObject(kind: ObjectKind) -> Bool
+    {
+        return self.object?.pointee.kind == kind
+    }
+
+    func formatted() -> String
+    {
+        switch self {
+            case let .bool(value):
+                return "\(value)"
+            case .nil:
+                return "nil"
+            case let .number(value):
+                return String(format: "%g", value)
+            case let .object(obj):
+                return ObjectRef.format(obj)
+        }
     }
 }
 
@@ -76,6 +76,7 @@ extension Value : Equatable
     }
 }
 
+/** Operations on objects that are relevant in a `Value` wrapper context. */
 extension ObjectRef
 {
     /**
@@ -95,14 +96,13 @@ extension ObjectRef
 
     /**
      Determine the subtype of the given object and produce an appropriate
-     debug string representation.
+     user-facing string representation.
      */
-    static func debugDescription(of object: ObjectRef) -> String
+    static func format(_ object: ObjectRef) -> String
     {
         switch object.pointee.kind {
             case .string:
-                let contents = String(cString: object.asStringRef().chars)
-                return "String(\(contents))"
+                return String(cString: object.asStringRef().chars)
         }
     }
 }

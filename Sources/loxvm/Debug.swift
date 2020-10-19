@@ -60,7 +60,7 @@ private func constantInstruction(_ code: OpCode,
                      : Int(chunk.code[instructionOffset + 1])
     let paddedName = code.debugName.padding(toLength: 16, withPad: " ", startingAt: 0)
     print(String(format: "%@ %4d", paddedName, idx), terminator: " ")
-    printValue(chunk.constants[idx])
+    print("'\(chunk.constants[idx].formatted())'")
 
     return instructionOffset + code.stepSize
 }
@@ -75,29 +75,13 @@ private func calculateLongConstantIndex(_ chunk: Chunk, _ offset: Int) -> Int
     }
 }
 
-private func printValue(_ value: Value)
-{
-    let description: String
-    switch value {
-        case let .number(number):
-            description = String(format: "%g", number)
-        case let .bool(boolean):
-            description = "\(boolean)"
-        case .nil:
-            description = "nil"
-        case .object(_):
-            description = value.debugDescription
-    }
-
-    print("'\(description)'")
-}
-
 private extension OpCode
 {
     var debugName: String
     {
         switch self {
             case .return: return "OP_RETURN"
+            case .print: return "OP_PRINT"
             case .constant: return "OP_CONSTANT"
             case .constantLong: return "OP_CONSTANT_LONG"
             case .nil: return "OP_NIL"
@@ -112,6 +96,7 @@ private extension OpCode
             case .subtract: return "OP_SUBTRACT"
             case .multiply: return "OP_MULTIPLY"
             case .divide: return "OP_DIVIDE"
+            case .pop: return "OP_POP"
         }
     }
 

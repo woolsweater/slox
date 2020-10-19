@@ -3,13 +3,15 @@ import Foundation
 /** A single instruction for the VM. */
 enum OpCode : UInt8
 {
-    case `return`
+    case `return`, print
     case constant, constantLong
     case `nil`, `true`, `false`
     case not
     case negate
     case equal, greater, less
     case add, subtract, multiply, divide
+    /** The operation for an expression statement; it is evaluated and discarded. */
+    case pop
 }
 
 /** A sequence of bytecode with auxiliary information. */

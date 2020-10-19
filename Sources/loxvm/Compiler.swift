@@ -53,8 +53,10 @@ extension Compiler
     func compile() -> Chunk?
     {
         self.advance()
-        self.expression()
-        self.mustConsume(.EOF, message: "Expected end of expression.")
+
+        while !self.match(.EOF) {
+            self.declaration()
+        }
 
         guard self.state == .normal else {
             return nil
@@ -104,11 +106,56 @@ extension Compiler
         self.advance()
     }
 
+    private func match(_ kind: Token.Kind) -> Bool
+    {
+        guard self.check(kind) else { return false }
+        self.advance()
+        return true
+    }
+
+    private func check(_ kind: Token.Kind) -> Bool
+    {
+        self.currentToken.kind == kind
+    }
+
     //MARK:- Parsing
 
     private func expression()
     {
         self.parse(fromPrecedence: .assignment)
+    }
+
+    private func declaration()
+    {
+        self.statement()
+
+        if self.state == .panic {
+            self.synchronize()
+        }
+    }
+
+    private func statement()
+    {
+        if self.match(.print) {
+            self.printStatement()
+        }
+        else {
+            self.expressionStatement()
+        }
+    }
+
+    private func printStatement()
+    {
+        self.expression()
+        self.mustConsume(.semicolon, message: "Expected ';' to terminate 'print' statement")
+        self.emitBytes(for: .print)
+    }
+
+    private func expressionStatement()
+    {
+        self.expression()
+        self.mustConsume(.semicolon, message: "Expected ';' to terminate expression")
+        self.emitBytes(for: .pop)
     }
 
     /**
@@ -268,7 +315,31 @@ extension Compiler
         }
     }
 
-    //MARK:- Error reporting
+    //MARK:- Error handling
+
+    /**
+     Scan and discard tokens until an apparent statement boundary, then
+     reset the `state` from `.panic`.
+     */
+    private func synchronize()
+    {
+        defer { self.state.synchronize() }
+        while self.currentToken.kind != .EOF {
+            // We want to restart at the beginning of the next statement-like thing,
+            // which means the token _after_ a semicolon...
+            guard self.previousToken.kind != .semicolon else { return }
+
+            switch self.currentToken.kind {
+                // or _on_ an appropriate keyword.
+                case .class, .fun, .var, .for, .if, .while, .print, .return:
+                    return
+                default:
+                    break
+            }
+
+            self.advance()
+        }
+    }
 
     private func reportErrorAtCurrent<S : StringProtocol>(message: S)
     {
