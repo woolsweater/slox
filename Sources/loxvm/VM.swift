@@ -19,14 +19,16 @@ class VM
     private var stack: RawStack<Value>
     /** All unique string values known to this interpretation context. */
     private var strings: HashTable
+    /** Variables that have been defined at global scope in this interpretation context. */
+    private var globals: HashTable
 
     init()
     {
         let allocator = MemoryManager()
         self.allocator = allocator
         self.stack = RawStack<Value>(size: VM.stackMaxSize, allocator: allocator)
-        self.strings = HashTable(allocator: { allocator.allocateBuffer(of: HashTable.Buffer.Element.self, count: $0) },
-                               deallocator: { allocator.destroyBuffer($0) })
+        self.strings = HashTable(manager: allocator)
+        self.globals = HashTable(manager: allocator)
     }
 
     deinit
@@ -81,13 +83,19 @@ extension VM
                     case .print:
                         print(self.stack.pop().formatted())
                     case .constant:
-                        let offset = self.ip.advanceTakingInt()
-                        let constant = self.chunk.constants[offset]
+                        let index = self.ip.advanceTakingInt()
+                        let constant = self.chunk.constants[index]
                         self.stack.push(constant)
                     case .constantLong:
-                        let offset = self.ip.advanceTakingThreeByteInt()
-                        let constant = self.chunk.constants[offset]
+                        let index = self.ip.advanceTakingThreeByteInt()
+                        let constant = self.chunk.constants[index]
                         self.stack.push(constant)
+                    case .defineGlobal:
+                        let index = self.ip.advanceTakingInt()
+                        self.defineVariable(forNameAt: index)
+                    case .defineGlobalLong:
+                        let index = self.ip.advanceTakingThreeByteInt()
+                        self.defineVariable(forNameAt: index)
                     case .nil:
                         self.stack.push(.nil)
                     case .true:
@@ -179,6 +187,23 @@ extension VM
         _ = self.stack.pop()
 
         self.stack.push(wrapper(operation(left, right)))
+    }
+
+    /**
+     Get a variable name from the `Chunk`'s constants list at the given
+     index, and insert it into the `globals` table with the value at the
+     top of the stack.
+     */
+    private func defineVariable(forNameAt index: Int)
+    {
+        let value = self.chunk.constants[index]
+        assert(value.isObject(kind: .string),
+               "Cannot read variable name at constant offset \(index)")
+        let name = value.object!.asStringRef()
+        self.globals.insert(self.stack.peek(), for: name)
+        // Wait to pop until the hash table has stored the value in
+        // case the insert triggers garbage collection
+        _ = self.stack.pop()
     }
 
     //MARK:- Error reporting

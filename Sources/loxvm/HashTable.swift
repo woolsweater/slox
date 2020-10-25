@@ -45,6 +45,16 @@ class HashTable
      Create an empty table that will use the given allocator to
      manage its storage.
      */
+    convenience init(manager: MemoryManager)
+    {
+        self.init(allocator: { manager.allocateBuffer(of: HashTable.Buffer.Element.self, count: $0) },
+                deallocator: { manager.destroyBuffer($0) })
+    }
+
+    /**
+     Create an empty table that will use the given pair of functions to
+     manage its storage.
+     */
     init(allocator: @escaping Allocator, deallocator: @escaping Deallocator)
     {
         self.count = 0

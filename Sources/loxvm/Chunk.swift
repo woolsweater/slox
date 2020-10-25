@@ -1,19 +1,5 @@
 import Foundation
 
-/** A single instruction for the VM. */
-enum OpCode : UInt8
-{
-    case `return`, print
-    case constant, constantLong
-    case `nil`, `true`, `false`
-    case not
-    case negate
-    case equal, greater, less
-    case add, subtract, multiply, divide
-    /** The operation for an expression statement; it is evaluated and discarded. */
-    case pop
-}
-
 /** A sequence of bytecode with auxiliary information. */
 struct Chunk
 {
@@ -57,27 +43,43 @@ extension Chunk
     }
 
     /**
+     Add the given `Value`, a string that is the name of a global variable
+     declared at the given line number, to the `Chunk`'s storage.
+     - returns: `false` if there are too many constants already present in the chunk.
+     */
+    mutating func write(globalName: Value, line: Int) -> Bool
+    {
+        assert(globalName.isObject(kind: .string), "Global variable name must be a string")
+        return self.write(constant: globalName, isGlobal: true, line: line)
+    }
+
+    /**
      Add the given constant value, which corresponds to an item at `line`
      in the original source, to the `Chunk`'s storage.
      - returns: `false` if there are too many constants already present in the chunk.
      */
     mutating func write(constant: Value, line: Int) -> Bool
     {
+        return self.write(constant: constant, isGlobal: false, line: line)
+    }
+
+    private mutating func write(constant: Value, isGlobal: Bool, line: Int) -> Bool
+    {
         let idx = self.add(constant: constant)
+        guard idx <= Int.threeByteMax else { return false }
 
         if idx <= UInt8.max {
-            self.write(opCode: .constant, line: line)
+            let opCode: OpCode = isGlobal ? .defineGlobal : .constant
+            self.write(opCode: opCode, line: line)
             self.write(byte: UInt8(idx), line: line)
-            return true
-        }
-        else if idx <= Int.threeByteMax {
-            self.write(opCode: .constantLong, line: line)
-            self.write(triple: idx, line: line)
-            return true
         }
         else {
-            return false
+            let opCode: OpCode = isGlobal ? .defineGlobalLong : .constantLong
+            self.write(opCode: opCode, line: line)
+            self.write(triple: idx, line: line)
         }
+
+        return true
     }
 
     private mutating func write(triple: Int, line: Int)

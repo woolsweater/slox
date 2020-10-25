@@ -37,7 +37,7 @@ func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
     }
 
     switch instruction {
-        case .constant, .constantLong:
+        case .constant, .constantLong, .defineGlobal, .defineGlobalLong:
             return constantInstruction(instruction, chunk, offset)
         default:
             return simpleInstruction(instruction, offset)
@@ -55,7 +55,7 @@ private func constantInstruction(_ code: OpCode,
                                  _ instructionOffset: Int)
     -> Int
 {
-    let isLong = (code == .constantLong)
+    let isLong = (code == .constantLong) || (code == .defineGlobalLong)
     let idx = isLong ? calculateLongConstantIndex(chunk, instructionOffset + 1)
                      : Int(chunk.code[instructionOffset + 1])
     let paddedName = code.debugName.padding(toLength: 16, withPad: " ", startingAt: 0)
@@ -84,6 +84,8 @@ private extension OpCode
             case .print: return "OP_PRINT"
             case .constant: return "OP_CONSTANT"
             case .constantLong: return "OP_CONSTANT_LONG"
+            case .defineGlobal: return "OP_DEFINE_GLOBAL"
+            case .defineGlobalLong: return "OP_DEFINE_GLOBAL_LONG"
             case .nil: return "OP_NIL"
             case .true: return "OP_TRUE"
             case .false: return "OP_FALSE"
@@ -103,8 +105,8 @@ private extension OpCode
     var stepSize: Int
     {
         switch self {
-            case .constant: return 2
-            case .constantLong: return 4
+            case .constant, .defineGlobal: return 2
+            case .constantLong, .defineGlobalLong: return 4
             default: return 1
         }
     }

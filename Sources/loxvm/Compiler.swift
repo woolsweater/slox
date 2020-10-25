@@ -127,7 +127,12 @@ extension Compiler
 
     private func declaration()
     {
-        self.statement()
+        if self.match(.var) {
+            self.variableDeclaration()
+        }
+        else {
+            self.statement()
+        }
 
         if self.state == .panic {
             self.synchronize()
@@ -156,6 +161,41 @@ extension Compiler
         self.expression()
         self.mustConsume(.semicolon, message: "Expected ';' to terminate expression")
         self.emitBytes(for: .pop)
+    }
+
+    private func variableDeclaration()
+    {
+        let name = self.parseVariable(failureMessage: "Expected a variable name")
+        let declarationLine = self.previousToken.lineNumber
+
+        if self.match(.equal) {
+            self.expression()
+        }
+        else {
+            self.emitBytes(for: .nil)
+        }
+        self.mustConsume(.semicolon, message: "Expected ';' to terminate variable declaration")
+
+        self.defineVariable(name, line: declarationLine)
+    }
+
+    private func parseVariable(failureMessage: String) -> StringRef
+    {
+        self.mustConsume(.identifier, message: failureMessage)
+        let lexeme = self.previousToken.lexeme
+        return lexeme.withCString {
+            let cString = UnsafeBufferPointer(start: $0, count: lexeme.utf8.count)
+            return self.allocator.createString(copying: cString)
+        }
+    }
+
+    private func defineVariable(_ name: StringRef, line: Int)
+    {
+        let success = self.chunk.write(globalName: .object(name.asBaseRef()),
+                                             line: line)
+        if !(success) {
+            self.reportError(message: "Constant storage limit exceeded.")
+        }
     }
 
     /**
