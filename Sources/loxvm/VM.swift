@@ -69,7 +69,7 @@ extension VM
             #if DEBUG_TRACE_EXECUTION
             print("        ")
             self.stack.printContents()
-            _ = disassembleInstruction(self.chunk, offset: ip.address)
+            disassembleInstruction(self.chunk, offset: ip.address)
             #endif
 
             guard let opCode = self.ip.advanceTakingOpCode() else {
@@ -276,23 +276,22 @@ private extension InstructionPointer
         defer { self += byteCount }
 
         var int: UInt32 = 0
-        memcpy(&int, self, byteCount)
+        self.copyBytes(to: &int, count: byteCount)
 
         return Int(CFSwapInt32LittleToHost(int))
     }
-}
 
-/**
- Pretend that the given `UInt32` and `InstructionPointer` are raw memory and copy
- `count` bytes from the latter to the former.
- - important: Do not attempt to copy more than 4 bytes.
- */
-private func memcpy(_ dest: inout UInt32, _ src: InstructionPointer, _ count: Int)
-{
-    precondition(count <= (dest.bitWidth / 8))
-    withUnsafeMutableBytes(of: &dest) { (bytes) in
-        for i in 0..<count {
-            bytes[i] = src.code[src.address + i]
+    /**
+     Copy the next `count` bytes from `code` into the given 4-byte space.
+     - important: Do not attempt to copy more than 4 bytes.
+     */
+    private func copyBytes(to dest: inout UInt32, count: Int)
+    {
+        precondition(count <= (dest.bitWidth / 8))
+        withUnsafeMutableBytes(of: &dest) { (bytes) in
+            for i in 0..<count {
+                bytes[i] = self.code[self.address + i]
+            }
         }
     }
 }

@@ -183,10 +183,7 @@ extension Compiler
     {
         self.mustConsume(.identifier, message: failureMessage)
         let lexeme = self.previousToken.lexeme
-        return lexeme.withCString {
-            let cString = UnsafeBufferPointer(start: $0, count: lexeme.utf8.count)
-            return self.allocator.createString(copying: cString)
-        }
+        return lexeme.withCStringBuffer(self.allocator.createString(copying:))
     }
 
     private func defineVariable(_ name: StringRef, line: Int)
@@ -524,5 +521,20 @@ private extension Token
     static var dummy: Token
     {
         return Token(kind: .EOF, lexeme: "not a token", lineNumber: -1)
+    }
+}
+
+private extension StringProtocol
+{
+    /**
+     Invoke `body` with a buffer pointer to the NUL-terminated UTF-8 contents
+     of the string.
+     - remark: The buffer's `count` includes the NUL character.
+     */
+    func withCStringBuffer<Result>(_ body: (ConstCStr) -> Result) -> Result
+    {
+        self.withCString { (chars) -> Result in
+            body(ConstCStr(start: chars, count: self.utf8.count + 1))
+        }
     }
 }

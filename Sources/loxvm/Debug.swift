@@ -19,6 +19,7 @@ func disassemble(_ chunk: Chunk, name: String)
  Emit a human-readable representation of the instruction at `offset` in
  the given `Chunk`, then return the offset of the next instruction.
  */
+@discardableResult
 func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
 {
     print(String(format:"%04d", offset), terminator: " ")
@@ -36,42 +37,51 @@ func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
         return offset + 1
     }
 
-    switch instruction {
-        case .constant, .constantLong, .defineGlobal, .defineGlobalLong:
-            return constantInstruction(instruction, chunk, offset)
-        default:
-            return simpleInstruction(instruction, offset)
+    if instruction.hasOperand {
+        return printOperandInstruction(instruction, at: offset, in: chunk)
+    }
+    else {
+        return printSimpleInstruction(instruction, at: offset)
     }
 }
 
-private func simpleInstruction(_ code: OpCode, _ offset: Int) -> Int
+private func printSimpleInstruction(_ opCode: OpCode, at offset: Int) -> Int
 {
-    print(code.debugName)
-    return offset + code.stepSize
+    print(opCode.debugName)
+    return offset + opCode.byteSize
 }
 
-private func constantInstruction(_ code: OpCode,
-                                 _ chunk: Chunk,
-                                 _ instructionOffset: Int)
+private func printOperandInstruction(_ opCode: OpCode,
+                                     at instructionOffset: Int,
+                                     in chunk: Chunk)
     -> Int
 {
-    let isLong = (code == .constantLong) || (code == .defineGlobalLong)
-    let idx = isLong ? calculateLongConstantIndex(chunk, instructionOffset + 1)
-                     : Int(chunk.code[instructionOffset + 1])
-    let paddedName = code.debugName.padding(toLength: 16, withPad: " ", startingAt: 0)
-    print(String(format: "%@ %4d", paddedName, idx), terminator: " ")
-    print("'\(chunk.constants[idx].formatted())'")
+    let index = calculateConstantIndex(for: opCode,
+                                startingAt: instructionOffset + 1,
+                                        in: chunk.code)
+    let paddedName = opCode.debugName.padding(toLength: 16, withPad: " ", startingAt: 0)
+    print(String(format: "%@ %4d", paddedName, index), terminator: " ")
+    print("'\(chunk.constants[index].formatted())'")
 
-    return instructionOffset + code.stepSize
+    return instructionOffset + opCode.byteSize
 }
 
-private func calculateLongConstantIndex(_ chunk: Chunk, _ offset: Int) -> Int
+private func calculateConstantIndex(for opCode: OpCode,
+                                    startingAt operandOffset: Int,
+                                    in byteCode: [UInt8])
+    -> Int
 {
-    let byteCount = 3
-    return chunk.code[offset..<offset+byteCount].withUnsafeBytes {
-        var int: UInt32 = 0
-        memcpy(&int, $0.baseAddress, byteCount)
-        return Int(CFSwapInt32LittleToHost(int))
+    let operandSize = opCode.byteSize - 1
+    if operandSize == 1 {
+        return Int(byteCode[operandOffset])
+    }
+    else {
+        assert(2...4 ~= operandSize)
+        return byteCode[operandOffset..<(operandOffset+operandSize)].withUnsafeBytes {
+            var int: UInt32 = 0
+            memcpy(&int, $0.baseAddress, operandSize)
+            return Int(CFSwapInt32LittleToHost(int))
+        }
     }
 }
 
@@ -102,7 +112,10 @@ private extension OpCode
         }
     }
 
-    var stepSize: Int
+    /**
+     The number of bytes the `OpCode` and its operand (if any) occupy.
+     */
+    var byteSize: Int
     {
         switch self {
             case .constant, .defineGlobal: return 2
@@ -110,4 +123,6 @@ private extension OpCode
             default: return 1
         }
     }
+
+    var hasOperand: Bool { self.byteSize > 1 }
 }
