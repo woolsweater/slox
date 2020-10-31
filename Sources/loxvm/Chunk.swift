@@ -43,40 +43,24 @@ extension Chunk
     }
 
     /**
-     Add the given `Value`, a string that is the name of a global variable
-     declared at the given line number, to the `Chunk`'s storage.
+     Add the given constant value, which corresponds to an item at `line` in
+     the original source, to the `Chunk`'s storage. Then write the appropriate
+     `OpCode` (using the long variant of the code that was passed, if needed) and
+     the index to the bytecode.
      - returns: `false` if there are too many constants already present in the chunk.
      */
-    mutating func write(globalName: Value, line: Int) -> Bool
+    mutating func write(constant: Value, operation: OpCode, line: Int) -> Bool
     {
-        assert(globalName.isObject(kind: .string), "Global variable name must be a string")
-        return self.write(constant: globalName, isGlobal: true, line: line)
-    }
+        let index = self.add(constant: constant)
+        guard index <= Int.threeByteMax else { return false }
 
-    /**
-     Add the given constant value, which corresponds to an item at `line`
-     in the original source, to the `Chunk`'s storage.
-     - returns: `false` if there are too many constants already present in the chunk.
-     */
-    mutating func write(constant: Value, line: Int) -> Bool
-    {
-        return self.write(constant: constant, isGlobal: false, line: line)
-    }
-
-    private mutating func write(constant: Value, isGlobal: Bool, line: Int) -> Bool
-    {
-        let idx = self.add(constant: constant)
-        guard idx <= Int.threeByteMax else { return false }
-
-        if idx <= UInt8.max {
-            let opCode: OpCode = isGlobal ? .defineGlobal : .constant
-            self.write(opCode: opCode, line: line)
-            self.write(byte: UInt8(idx), line: line)
+        if index <= UInt8.max {
+            self.write(opCode: operation, line: line)
+            self.write(byte: UInt8(index), line: line)
         }
         else {
-            let opCode: OpCode = isGlobal ? .defineGlobalLong : .constantLong
-            self.write(opCode: opCode, line: line)
-            self.write(triple: idx, line: line)
+            self.write(opCode: operation.longVariant, line: line)
+            self.write(triple: index, line: line)
         }
 
         return true
@@ -143,4 +127,18 @@ private extension Int
 {
     /** The highest value that can be stored in three bytes unsigned. */
     static let threeByteMax = 16777215
+}
+
+private extension OpCode
+{
+    var longVariant: OpCode
+    {
+        switch self {
+            case .constant: return .constantLong
+            case .defineGlobal: return .defineGlobalLong
+            case .readGlobal: return .readGlobalLong
+            default:
+                fatalError("\(self) has no long variant")
+        }
+    }
 }

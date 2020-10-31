@@ -23,6 +23,15 @@ enum OpCode : UInt8
      */
     case defineGlobal, defineGlobalLong
 
+    /**
+     Read the value from the current interpretation context's global variable
+     table. The operand is the index into the `constants` table where the
+     name is stored.
+     - remark: The "long" variant means that the index is stored across the
+     next _three_ bytes, rather than one.
+     */
+    case readGlobal, readGlobalLong
+
     /** Built-in literal values */
     case `nil`, `true`, `false`
 

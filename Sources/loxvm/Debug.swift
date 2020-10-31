@@ -96,6 +96,8 @@ private extension OpCode
             case .constantLong: return "OP_CONSTANT_LONG"
             case .defineGlobal: return "OP_DEFINE_GLOBAL"
             case .defineGlobalLong: return "OP_DEFINE_GLOBAL_LONG"
+            case .readGlobal: return "OP_READ_GLOBAL"
+            case .readGlobalLong: return "OP_READ_GLOBAL_LONG"
             case .nil: return "OP_NIL"
             case .true: return "OP_TRUE"
             case .false: return "OP_FALSE"
@@ -118,8 +120,8 @@ private extension OpCode
     var byteSize: Int
     {
         switch self {
-            case .constant, .defineGlobal: return 2
-            case .constantLong, .defineGlobalLong: return 4
+            case .constant, .defineGlobal, .readGlobal: return 2
+            case .constantLong, .defineGlobalLong, .readGlobalLong: return 4
             default: return 1
         }
     }

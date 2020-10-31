@@ -176,30 +176,22 @@ extension Compiler
         }
         self.mustConsume(.semicolon, message: "Expected ';' to terminate variable declaration")
 
-        self.defineVariable(name, line: declarationLine)
+        self.emitConstant(value: .object(name.asBaseRef()),
+                      operation: .defineGlobal,
+                           line: declarationLine)
     }
 
     private func parseVariable(failureMessage: String) -> StringRef
     {
         self.mustConsume(.identifier, message: failureMessage)
-        let lexeme = self.previousToken.lexeme
-        return lexeme.withCStringBuffer(self.allocator.createString(copying:))
-    }
-
-    private func defineVariable(_ name: StringRef, line: Int)
-    {
-        let success = self.chunk.write(globalName: .object(name.asBaseRef()),
-                                             line: line)
-        if !(success) {
-            self.reportError(message: "Constant storage limit exceeded.")
-        }
+        return self.previousToken.lexeme.withCStringBuffer(self.copyOrInternString(_:))
     }
 
     /**
      Consume and handle tokens from the stream as long as the precedence rank of encountered
      tokens is higher than the starting `precedence`.
      */
-    private func parse(fromPrecedence precedence: ParsePrecendence)
+    private func parse(fromPrecedence precedenceLimit: ParsePrecendence)
     {
         self.advance()
 
@@ -214,7 +206,7 @@ extension Compiler
         // Compile the remainder of the expression if the current token is an infix operation
         // of some kind and has sufficiently high precedence.
         var nextRule = Compiler.parseRule(for: self.currentToken.kind)
-        while precedence <= nextRule.precedence {
+        while precedenceLimit <= nextRule.precedence {
             self.advance()
 
             guard let infixParser = nextRule.infix else {
@@ -276,7 +268,7 @@ extension Compiler
         guard let value = Double(self.previousToken.lexeme) else {
             fatalError("Failed to convert token '\(self.previousToken.lexeme)' to a Value")
         }
-        self.emitConstant(value: .number(value))
+        self.emitConstant(value: .number(value), operation: .constant)
     }
 
     private func unary()
@@ -291,6 +283,19 @@ extension Compiler
             default:
                 fatalError("Token had non-unary Kind '\(operatorKind)'")
         }
+    }
+
+    private func variable()
+    {
+        self.namedVariable()
+    }
+
+    private func namedVariable()
+    {
+        let name = self.previousToken.lexeme
+            .withCStringBuffer(self.copyOrInternString(_:))
+        self.emitConstant(value: .object(name.asBaseRef()),
+                      operation: .readGlobal)
     }
 
     private func string()
@@ -308,17 +313,8 @@ extension Compiler
         // skipping rendering if possible -- we'd get a pointer to the String's
         // contents (`withCString`) and copy from that directly.
         do {
-            let object: StringRef = try self.stringCompiler.withRenderedEscapes(in: contents) {
-                (rendered) in
-                if let existing = self.strings.findString(matching: rendered) {
-                    return existing
-                }
-                else {
-                    let new = self.allocator.createString(copying: rendered)
-                    self.strings.internString(new)
-                    return new
-                }
-            }
+            let object: StringRef = try self.stringCompiler.withRenderedEscapes(in: contents,
+                                                                                self.copyOrInternString(_:))
             self.emitConstant(value: .object(object.asBaseRef()))
         }
         catch let error as StringEscapeError {
@@ -330,6 +326,23 @@ extension Compiler
         }
     }
 
+    /**
+     Look up the givn string in the global `strings` table and return the
+     existing instance if found; otherwise initialize and return a new
+     `StringRef`, inserting it into `strings` first.
+     */
+    private func copyOrInternString(_ string: ConstCStr) -> StringRef
+    {
+        if let existing = self.strings.findString(matching: string) {
+            return existing
+        }
+        else {
+            let new = self.allocator.createString(copying: string)
+            self.strings.internString(new)
+            return new
+        }
+    }
+
     //MARK:- Chunk handling
 
     private func emitReturn()
@@ -337,9 +350,11 @@ extension Compiler
         self.emitBytes(for: .return)
     }
 
-    private func emitConstant(value: Value)
+    private func emitConstant(value: Value, operation: OpCode = .constant, line: Int? = nil)
     {
-        let success = self.chunk.write(constant: value, line: self.previousToken.lineNumber)
+        let success = self.chunk.write(constant: value,
+                                      operation: operation,
+                                           line: line ?? self.previousToken.lineNumber)
         if !(success) {
             self.reportError(message: "Constant storage limit exceeded.")
         }
@@ -462,7 +477,7 @@ private extension Compiler
             case .greaterEqual : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
             case .less         : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
             case .lessEqual    : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
-            case .identifier   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .identifier   : return ParseRule(prefix: Compiler.variable, infix: nil, precedence: .none)
             case .string       : return ParseRule(prefix: Compiler.string, infix: nil, precedence: .none)
             case .number       : return ParseRule(prefix: Compiler.number, infix: nil, precedence: .none)
             case .and          : return ParseRule(prefix: nil, infix: nil, precedence: .and)

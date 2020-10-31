@@ -96,6 +96,12 @@ extension VM
                     case .defineGlobalLong:
                         let index = self.ip.advanceTakingThreeByteInt()
                         self.defineVariable(forNameAt: index)
+                    case .readGlobal:
+                        let index = self.ip.advanceTakingInt()
+                        try self.readVariable(forNameAt: index)
+                    case .readGlobalLong:
+                        let index = self.ip.advanceTakingThreeByteInt()
+                        try self.readVariable(forNameAt: index)
                     case .nil:
                         self.stack.push(.nil)
                     case .true:
@@ -144,6 +150,7 @@ extension VM
     }
 
     private struct BinaryOperandError : Error {}
+    private struct UndefinedVariable : Error {}
 
     private func concatenate() throws
     {
@@ -204,6 +211,21 @@ extension VM
         // Wait to pop until the hash table has stored the value in
         // case the insert triggers garbage collection
         _ = self.stack.pop()
+    }
+
+    private func readVariable(forNameAt index: Int) throws
+    {
+        let constant = self.chunk.constants[index]
+        assert(constant.isObject(kind: .string),
+               "Cannot read variable name at constant offset \(index)")
+        let name = constant.object!.asStringRef()
+        guard let value = self.globals.value(for: name) else {
+            let swiftName = String(cString: name.chars)
+            self.reportRuntimeError("Undefined variable '%@'", swiftName)
+            throw UndefinedVariable()
+        }
+
+        self.stack.push(value)
     }
 
     //MARK:- Error reporting
