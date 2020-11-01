@@ -137,6 +137,7 @@ private extension OpCode
             case .constant: return .constantLong
             case .defineGlobal: return .defineGlobalLong
             case .readGlobal: return .readGlobalLong
+            case .setGlobal: return .setGlobalLong
             default:
                 fatalError("\(self) has no long variant")
         }

@@ -201,7 +201,8 @@ extension Compiler
             return
         }
 
-        prefixParser(self)()
+        let canAssign = precedenceLimit <= .assignment
+        prefixParser(self)(canAssign)
 
         // Compile the remainder of the expression if the current token is an infix operation
         // of some kind and has sufficiently high precedence.
@@ -285,17 +286,33 @@ extension Compiler
         }
     }
 
-    private func variable()
+    private func variable(_ canAssign: Bool)
     {
-        self.namedVariable()
+        self.namedVariable(canAssign)
     }
 
-    private func namedVariable()
+    private func namedVariable(_ canAssign: Bool)
     {
         let name = self.previousToken.lexeme
             .withCStringBuffer(self.copyOrInternString(_:))
+        let identifierLine = self.previousToken.lineNumber
+
+        let operation: OpCode
+        if self.match(.equal) {
+            guard canAssign else {
+                return self.reportError(at: self.previousToken,
+                                   message: "Invalid assignment target")
+            }
+            self.expression()
+            operation = .setGlobal
+        }
+        else {
+            operation = .readGlobal
+        }
+
         self.emitConstant(value: .object(name.asBaseRef()),
-                      operation: .readGlobal)
+                      operation: operation,
+                           line: identifierLine)
     }
 
     private func string()
@@ -442,11 +459,25 @@ private extension Compiler
     struct ParseRule
     {
         /**
-         Parsing method to be called when the token is found at the beginning of an expression.
+         A `Compiler` method that parses an expression where assignments can be handled.
+         - parameter canAssign: Whether the current parsing context is permitted to be part of
+         an assignment statement (either a variable or an object setter).
          */
-        let prefix: ((Compiler) -> () -> Void)?
+        typealias AssignmentParseFunc = (Compiler) -> (_ canAssign: Bool) -> Void
+        /**
+         A `Compiler` method that parses an expression where assignments are not
+         syntactically allowed.
+         */
+        typealias ParseFunc = (Compiler) -> () -> Void
+
+        /**
+         Parsing method to be called when the token is found at the beginning of an expression.
+         - remark: Most parse methods actually do not need the `canAssign` flag; it will be
+         swallowed in that case (see `init(nonassigningPrefix:infix:precedence:)`
+         */
+        let prefix: AssignmentParseFunc?
         /** Parsing method to be called when the token is found inside an expression. */
-        let infix: ((Compiler) -> () -> Void)?
+        let infix: ParseFunc?
         /**
          Infix precedence for the token, controlling how much of the token stream will be parsed
          into the operand.
@@ -458,18 +489,18 @@ private extension Compiler
     {
         // Note that any rule lacking an infix parser will also have the lowest possible precedence
         switch kind {
-            case .leftParen    : return ParseRule(prefix: Compiler.grouping, infix: nil, precedence: .call)
+            case .leftParen    : return ParseRule(nonassigningPrefix: Compiler.grouping, infix: nil, precedence: .call)
             case .rightParen   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .leftBrace    : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .rightBrace   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .comma        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .dot          : return ParseRule(prefix: nil, infix: nil, precedence: .call)
             case .semicolon    : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .minus        : return ParseRule(prefix: Compiler.unary, infix: Compiler.binary, precedence: .term)
+            case .minus        : return ParseRule(nonassigningPrefix: Compiler.unary, infix: Compiler.binary, precedence: .term)
             case .plus         : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .term)
             case .slash        : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .factor)
             case .star         : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .factor)
-            case .bang         : return ParseRule(prefix: Compiler.unary, infix: nil, precedence: .none)
+            case .bang         : return ParseRule(nonassigningPrefix: Compiler.unary, infix: nil, precedence: .none)
             case .bangEqual    : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .equality)
             case .equal        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .equalEqual   : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .equality)
@@ -478,23 +509,23 @@ private extension Compiler
             case .less         : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
             case .lessEqual    : return ParseRule(prefix: nil, infix: Compiler.binary, precedence: .comparison)
             case .identifier   : return ParseRule(prefix: Compiler.variable, infix: nil, precedence: .none)
-            case .string       : return ParseRule(prefix: Compiler.string, infix: nil, precedence: .none)
-            case .number       : return ParseRule(prefix: Compiler.number, infix: nil, precedence: .none)
+            case .string       : return ParseRule(nonassigningPrefix: Compiler.string, infix: nil, precedence: .none)
+            case .number       : return ParseRule(nonassigningPrefix: Compiler.number, infix: nil, precedence: .none)
             case .and          : return ParseRule(prefix: nil, infix: nil, precedence: .and)
             case .break        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .class        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .else         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .false        : return ParseRule(prefix: Compiler.literal, infix: nil, precedence: .none)
+            case .false        : return ParseRule(nonassigningPrefix: Compiler.literal, infix: nil, precedence: .none)
             case .for          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .fun          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .if           : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .nil          : return ParseRule(prefix: Compiler.literal, infix: nil, precedence: .none)
+            case .nil          : return ParseRule(nonassigningPrefix: Compiler.literal, infix: nil, precedence: .none)
             case .or           : return ParseRule(prefix: nil, infix: nil, precedence: .or)
             case .print        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .return       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .super        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .this         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .true         : return ParseRule(prefix: Compiler.literal, infix: nil, precedence: .none)
+            case .true         : return ParseRule(nonassigningPrefix: Compiler.literal, infix: nil, precedence: .none)
             case .unless       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .until        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .var          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
@@ -502,6 +533,18 @@ private extension Compiler
             case .error        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .EOF          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
         }
+    }
+}
+
+private extension Compiler.ParseRule
+{
+    /** Create a parse rule for a token type that does not need the `canAssign` flag. */
+    init(nonassigningPrefix: ParseFunc?, infix: ParseFunc?, precedence: Compiler.ParsePrecendence)
+    {
+        // Ignore the boolean `canAssign` flag
+        self.prefix = nonassigningPrefix.map({ (fn) in { (compiler) in { (_) in fn(compiler)() }}})
+        self.infix = infix
+        self.precedence = precedence
     }
 }
 

@@ -26,9 +26,11 @@ func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
 
     let lineNumber = chunk.lineNumber(forByteAt: offset)
     if offset > 0 && lineNumber == chunk.lineNumber(forByteAt: offset - 1) {
+        // Continuation of a source line
         print("   |", terminator: " ")
     }
     else {
+        // New source line
         print(String(format: "%04d", lineNumber), terminator: " ")
     }
 
@@ -98,6 +100,8 @@ private extension OpCode
             case .defineGlobalLong: return "OP_DEFINE_GLOBAL_LONG"
             case .readGlobal: return "OP_READ_GLOBAL"
             case .readGlobalLong: return "OP_READ_GLOBAL_LONG"
+            case .setGlobal: return "OP_SET_GLOBAL"
+            case .setGlobalLong: return "OP_SET_GLOBAL_LONG"
             case .nil: return "OP_NIL"
             case .true: return "OP_TRUE"
             case .false: return "OP_FALSE"
@@ -120,9 +124,12 @@ private extension OpCode
     var byteSize: Int
     {
         switch self {
-            case .constant, .defineGlobal, .readGlobal: return 2
-            case .constantLong, .defineGlobalLong, .readGlobalLong: return 4
-            default: return 1
+            case .constant, .defineGlobal, .readGlobal, .setGlobal:
+                return 2
+            case .constantLong, .defineGlobalLong, .readGlobalLong, .setGlobalLong:
+                return 4
+            default:
+                return 1
         }
     }
 

@@ -124,21 +124,26 @@ extension HashTable
      Add an entry to the table for the given key-value pair.
      - remark: If `key` is already present, the old value will
      be replaced by the new one.
+     - returns: `true` if the key did not exist in the table
+     already.
      */
-    func insert(_ value: Value, for key: StringRef)
+    @discardableResult
+    func insert(_ value: Value, for key: StringRef) -> Bool
     {
         if self.needsExpansionOnInsertion {
             self.expand()
         }
 
         let slot = self.entries.findSlot(for: key)
+        let isNew = (slot.pointee == nil)
+        slot.pointee = .live(key: key, value: value)
 
-        if slot.pointee == nil {
+        if isNew {
             // Tombstones are already included in the count
             self.count += 1
         }
 
-        slot.pointee = .live(key: key, value: value)
+        return isNew
     }
 
     /**
@@ -151,6 +156,7 @@ extension HashTable
     }
 
     /** Remove the entry for `key` from the table, if it is present. */
+    @discardableResult
     func deleteValue(for key: StringRef) -> Bool
     {
         guard self.count > 0 else { return false }

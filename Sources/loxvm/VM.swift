@@ -102,6 +102,12 @@ extension VM
                     case .readGlobalLong:
                         let index = self.ip.advanceTakingThreeByteInt()
                         try self.readVariable(forNameAt: index)
+                    case .setGlobal:
+                        let index = self.ip.advanceTakingInt()
+                        try self.setValue(forNameAt: index)
+                    case .setGlobalLong:
+                        let index = self.ip.advanceTakingThreeByteInt()
+                        try self.setValue(forNameAt: index)
                     case .nil:
                         self.stack.push(.nil)
                     case .true:
@@ -143,6 +149,11 @@ extension VM
                         _ = self.stack.pop()
                 }
             }
+            catch let undefined as UndefinedVariable {
+                self.reportRuntimeError("Undefined variable '%@'",
+                                        undefined.renderedName)
+                return .runtimeError
+            }
             catch {
                 return .runtimeError
             }
@@ -150,7 +161,10 @@ extension VM
     }
 
     private struct BinaryOperandError : Error {}
-    private struct UndefinedVariable : Error {}
+    private struct UndefinedVariable : Error {
+        let name: StringRef
+        var renderedName: String { String(cString: self.name.chars) }
+    }
 
     private func concatenate() throws
     {
@@ -186,7 +200,7 @@ extension VM
             case let .number(right) = self.stack.peek(),
             case let .number(left) = self.stack.peek(distance: 1) else
         {
-            self.reportRuntimeError("Operands must be numbers.")
+            self.reportRuntimeError("Operands must both be numbers.")
             throw BinaryOperandError()
         }
 
@@ -203,10 +217,10 @@ extension VM
      */
     private func defineVariable(forNameAt index: Int)
     {
-        let value = self.chunk.constants[index]
-        assert(value.isObject(kind: .string),
-               "Cannot read variable name at constant offset \(index)")
-        let name = value.object!.asStringRef()
+        guard let name = self.variableNameConstant(at: index) else {
+            fatalError("Internal error: variable name lookup failed")
+        }
+
         self.globals.insert(self.stack.peek(), for: name)
         // Wait to pop until the hash table has stored the value in
         // case the insert triggers garbage collection
@@ -215,17 +229,41 @@ extension VM
 
     private func readVariable(forNameAt index: Int) throws
     {
-        let constant = self.chunk.constants[index]
-        assert(constant.isObject(kind: .string),
-               "Cannot read variable name at constant offset \(index)")
-        let name = constant.object!.asStringRef()
+        guard let name = self.variableNameConstant(at: index) else {
+            fatalError("Internal error: variable name lookup failed")
+        }
+
         guard let value = self.globals.value(for: name) else {
-            let swiftName = String(cString: name.chars)
-            self.reportRuntimeError("Undefined variable '%@'", swiftName)
-            throw UndefinedVariable()
+            throw UndefinedVariable(name: name)
         }
 
         self.stack.push(value)
+    }
+
+    private func setValue(forNameAt index: Int) throws
+    {
+        guard let name = self.variableNameConstant(at: index) else {
+            fatalError("Internal error: variable name lookup failed")
+        }
+
+        let value = self.stack.peek()
+        guard !self.globals.insert(value, for: name) else {
+            // Clean up in case we're in a REPL context:
+            // Back out the name so that it remains undefined
+            self.globals.deleteValue(for: name)
+            // Drop the value we were going to assign
+            _ = self.stack.pop()
+
+            throw UndefinedVariable(name: name)
+        }
+    }
+
+    private func variableNameConstant(at index: Int) -> StringRef?
+    {
+        let constant = self.chunk.constants[index]
+        assert(constant.isObject(kind: .string),
+               "Cannot read variable name at constant offset \(index)")
+        return constant.object?.asStringRef()
     }
 
     //MARK:- Error reporting
