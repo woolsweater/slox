@@ -6,7 +6,12 @@ struct Chunk
     /** The bytecode itself: opcodes plus their operands. */
     private(set) var code: [UInt8] = []
 
-    /** Storage for constant values used in this chunk. */
+    /**
+     Storage for constant values used in this chunk.
+     - remark: The chunk takes advantage of the fact that strings
+     (including variable names) are deduplicated and does not
+     insert one that already exists in the list.
+     */
     private(set) var constants: [Value] = []
 
     /**
@@ -81,11 +86,19 @@ extension Chunk
     /**
      Add the given constant value to the `Chunk`'s storage. The index
      where it is stored is returned.
+     - remark: Since strings (including variable names) are uniqued by
+     the `Compiler`, if the new value is a string and can be found in
+     the constants list already, it is not added again and the existing
+     index is returned.
      */
     private mutating func add(constant: Value) -> Int
     {
-        self.constants.append(constant)
-        return self.constants.count - 1
+        if constant.isObject(kind: .string), let index = self.constants.firstIndex(of: constant) {
+            return index
+        } else {
+            self.constants.append(constant)
+            return self.constants.endIndex - 1
+        }
     }
 }
 

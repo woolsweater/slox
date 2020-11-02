@@ -161,7 +161,8 @@ extension VM
     }
 
     private struct BinaryOperandError : Error {}
-    private struct UndefinedVariable : Error {
+    private struct UndefinedVariable : Error
+    {
         let name: StringRef
         var renderedName: String { String(cString: self.name.chars) }
     }
@@ -261,9 +262,12 @@ extension VM
     private func variableNameConstant(at index: Int) -> StringRef?
     {
         let constant = self.chunk.constants[index]
-        assert(constant.isObject(kind: .string),
-               "Cannot read variable name at constant offset \(index)")
-        return constant.object?.asStringRef()
+        guard constant.isObject(kind: .string) else {
+            assertionFailure("Cannot read variable name at constant offset \(index)")
+            return nil
+        }
+
+        return constant.object!.asStringRef()
     }
 
     //MARK:- Error reporting

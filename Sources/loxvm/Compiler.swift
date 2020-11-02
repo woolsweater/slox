@@ -327,7 +327,7 @@ extension Compiler
         // escapes. This matches the Wren implementation (wren_compiler.c -> readString)
         // so we won't worry about it for now. At some point, though, it would be good
         // to compare the performance of scanning the string for backslashes first and
-        // skipping rendering if possible -- we'd get a pointer to the String's
+        // skipping rendering if it's not needed -- we'd get a pointer to the String's
         // contents (`withCString`) and copy from that directly.
         do {
             let object: StringRef = try self.stringCompiler.withRenderedEscapes(in: contents,
