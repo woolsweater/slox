@@ -67,9 +67,9 @@ class HashTable
     /** Reset the table, removing all entries. */
     deinit
     {
-        self.count = 0
-        self.deallocate(self.entries)
-        self.entries = nil
+        if self.count > 0 {
+            self.deallocate(self.entries)
+        }
     }
 }
 
