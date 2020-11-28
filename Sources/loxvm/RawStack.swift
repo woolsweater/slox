@@ -17,7 +17,7 @@ struct RawStack<Element>
     init(size: Int, allocator: MemoryManager)
     {
         self.buffer = allocator.allocateBuffer(count: size)
-        self.top = buffer.baseAddress!
+        self.top = self.buffer.baseAddress!
     }
 
     /**
@@ -44,6 +44,12 @@ struct RawStack<Element>
         precondition(self.top > self.buffer.baseAddress!)
         self.top -= 1
         return self.top.move()
+    }
+
+    /** Remove and discard all values currently in the stack. */
+    mutating func reset()
+    {
+        self.top = self.buffer.baseAddress!
     }
 
     /** Return the value at the given distance from the top of the stack, keeping it in place. */

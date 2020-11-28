@@ -252,9 +252,8 @@ extension VM
             // Clean up in case we're in a REPL context:
             // Back out the name so that it remains undefined
             self.globals.deleteValue(for: name)
-            // Drop the value we were going to assign
-            _ = self.stack.pop()
-
+            // The stack will be cleaned up in the error handler
+            
             throw UndefinedVariable(name: name)
         }
     }
@@ -277,6 +276,8 @@ extension VM
         let message = String(format: format, arguments: values)
         let lineNumber = self.chunk.lineNumber(forByteAt: self.ip.address)
         StdErr.print("\(lineNumber): error: Runtime Error: \(message)")
+
+        self.stack.reset()
     }
 }
 
