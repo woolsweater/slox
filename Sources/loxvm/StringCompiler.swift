@@ -49,6 +49,8 @@ extension StringCompiler
         let count = contents.cStringLength()
 
         let result = self.allocate(count + 1)
+        var needsCleanup = true
+        defer { if needsCleanup { self.destroy(UnsafeMutableRawBufferPointer(resutl).bindMemory(to: CChar.self)) } }
         var currentDest = result.baseAddress!
 
         var currentSource = contents
@@ -84,6 +86,7 @@ extension StringCompiler
             currentSource = digitEnd + 1    // Step over terminator
         }
 
+        needsCleanup = false
         currentDest.appendContents(of: currentSource, through: contents + count)
         currentDest.pointee = 0x0
 

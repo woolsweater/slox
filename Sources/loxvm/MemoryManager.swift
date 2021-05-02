@@ -89,7 +89,9 @@ class MemoryManager
 
     func destroyObject<T>(_ object: UnsafeMutablePointer<T>) where T : LoxObjectType
     {
-        guard let root = self.rootObject else { fatalError("This object cannot exist") }
+        guard let root = self.rootObject else {
+            fatalError("The argument object is unknown to the manager!")
+        }
         let toDestroy = object.asBaseRef()
         guard let previous = ObjectList(first: root).objectBefore(toDestroy) else {
             fatalError("Nonexistence!")
