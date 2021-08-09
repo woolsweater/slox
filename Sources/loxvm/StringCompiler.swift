@@ -50,7 +50,7 @@ extension StringCompiler
 
         let result = self.allocate(count + 1)
         var needsCleanup = true
-        defer { if needsCleanup { self.destroy(UnsafeMutableRawBufferPointer(resutl).bindMemory(to: CChar.self)) } }
+        defer { if needsCleanup { self.destroy(UnsafeMutableRawBufferPointer(result).bindMemory(to: CChar.self)) } }
         var currentDest = result.baseAddress!
 
         var currentSource = contents

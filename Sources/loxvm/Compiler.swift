@@ -27,6 +27,7 @@ class Compiler
 
     private let scanner: Scanner
     private let strings: HashTable
+    private let identifiers: HashTable
     private let allocator: MemoryManager
     private lazy var stringCompiler = StringCompiler(allocate: { [allocator] in allocator.allocateBuffer(of: UInt8.self, count: $0) },
                                                       destroy: { [allocator] in allocator.destroyBuffer($0) })
@@ -43,6 +44,7 @@ class Compiler
     {
         self.scanner = Scanner(source: source)
         self.strings = stringsTable
+        self.identifiers = HashTable(manager: allocator)
         self.allocator = allocator
     }
 }
@@ -176,9 +178,18 @@ extension Compiler
         }
         self.mustConsume(.semicolon, message: "Expected ';' to terminate variable declaration")
 
-        self.emitConstant(value: .object(name.asBaseRef()),
-                      operation: .defineGlobal,
-                           line: declarationLine)
+        if case let .number(existingIndex)? = self.identifiers.value(for: name) {
+            self.chunk.write(operation: .defineGlobal,
+                              argument: Int(existingIndex),
+                                  line: declarationLine)
+        }
+        else {
+            let index = self.emitConstant(value: .object(name.asBaseRef()),
+                                      operation: .defineGlobal,
+                                           line: declarationLine)
+            guard let newIndex = index else { return }
+            self.identifiers.insert(.number(Double(newIndex)), for: name)
+        }
     }
 
     private func parseVariable(failureMessage: String) -> StringRef
@@ -344,7 +355,7 @@ extension Compiler
     }
 
     /**
-     Look up the givn string in the global `strings` table and return the
+     Look up the given string in the global `strings` table and return the
      existing instance if found; otherwise initialize and return a new
      `StringRef`, inserting it into `strings` first.
      */
@@ -367,20 +378,23 @@ extension Compiler
         self.emitBytes(for: .return)
     }
 
-    private func emitConstant(value: Value, operation: OpCode = .constant, line: Int? = nil)
+    @discardableResult
+    private func emitConstant(value: Value, operation: OpCode = .constant, line: Int? = nil) -> Int?
     {
-        let success = self.chunk.write(constant: value,
-                                      operation: operation,
-                                           line: line ?? self.previousToken.lineNumber)
-        if !(success) {
+        let index = self.chunk.write(constant: value,
+                                    operation: operation,
+                                         line: line ?? self.previousToken.lineNumber)
+        if index == nil {
             self.reportError(message: "Constant storage limit exceeded.")
         }
+
+        return index
     }
 
-    private func emitBytes(for opCodes: OpCode...)
+    private func emitBytes(for opCodes: OpCode..., line: Int? = nil)
     {
         for code in opCodes {
-            self.chunk.write(opCode: code, line: self.previousToken.lineNumber)
+            self.chunk.write(opCode: code, line: line ?? self.previousToken.lineNumber)
         }
     }
 

@@ -6,12 +6,7 @@ struct Chunk
     /** The bytecode itself: opcodes plus their operands. */
     private(set) var code: [UInt8] = []
 
-    /**
-     Storage for constant values used in this chunk.
-     - remark: The chunk takes advantage of the fact that strings
-     (including variable names) are deduplicated and does not
-     insert one that already exists in the list.
-     */
+    /** Storage for constant values used in this chunk. */
     private(set) var constants: [Value] = []
 
     /**
@@ -31,7 +26,7 @@ extension Chunk
     {
         self.code.append(byte)
         if line == self.lineNumbers.last?.0 {
-            self.lineNumbers.mutateLast { $0.count += 1 }
+            self.lineNumbers.mutateLast({ $0.count += 1 })
         }
         else {
             self.lineNumbers.append((line, count: 1))
@@ -52,23 +47,40 @@ extension Chunk
      the original source, to the `Chunk`'s storage. Then write the appropriate
      `OpCode` (using the long variant of the code that was passed, if needed) and
      the index to the bytecode.
-     - returns: `false` if there are too many constants already present in the chunk.
+     - returns: The index of the new constant, or `nil` if there are too many
+     constants already present in the chunk.
      */
-    mutating func write(constant: Value, operation: OpCode, line: Int) -> Bool
+    mutating func write(constant: Value, operation: OpCode, line: Int) -> Int?
     {
         let index = self.add(constant: constant)
-        guard index <= Int.threeByteMax else { return false }
+        guard index <= Int.threeByteMax else { return nil }
 
-        if index <= UInt8.max {
+        self.write(operation: operation, argument: index, line: line)
+
+        return index
+    }
+
+    /**
+     Add a constant-manipulating `operation` to the bytecode, along with the
+     `argument` index that it should use.
+     The long variant of `operation` is used if needed.
+
+     - precondition: `argument` must be an existing index to the `Chunk`'s
+     `constants`.
+     */
+    mutating func write(operation: OpCode, argument: Int, line: Int)
+    {
+        precondition(self.constants.indices ~= argument,
+                     "Invalid constant address \(argument); only \(self.constants.count) items are present.")
+
+        if argument <= UInt8.max {
             self.write(opCode: operation, line: line)
-            self.write(byte: UInt8(index), line: line)
+            self.write(byte: UInt8(argument), line: line)
         }
         else {
             self.write(opCode: operation.longVariant, line: line)
-            self.write(triple: index, line: line)
+            self.write(triple: argument, line: line)
         }
-
-        return true
     }
 
     private mutating func write(triple: Int, line: Int)
@@ -76,29 +88,21 @@ extension Chunk
         precondition(triple <= Int.threeByteMax, "Input too large: \(triple)")
 
         var triple = triple.littleEndian
-        withUnsafeBytes(of: &triple) { (buf) in
+        withUnsafeBytes(of: &triple, { (buf) in
             self.write(byte: buf[0], line: line)
             self.write(byte: buf[1], line: line)
             self.write(byte: buf[2], line: line)
-        }
+        })
     }
 
     /**
      Add the given constant value to the `Chunk`'s storage. The index
      where it is stored is returned.
-     - remark: Since strings (including variable names) are uniqued by
-     the `Compiler`, if the new value is a string and can be found in
-     the constants list already, it is not added again and the existing
-     index is returned.
      */
     private mutating func add(constant: Value) -> Int
     {
-        if constant.isObject(kind: .string), let index = self.constants.firstIndex(of: constant) {
-            return index
-        } else {
-            self.constants.append(constant)
-            return self.constants.endIndex - 1
-        }
+        self.constants.append(constant)
+        return self.constants.endIndex - 1
     }
 }
 

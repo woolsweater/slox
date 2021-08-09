@@ -293,7 +293,7 @@ private struct InstructionPointer
     let code: Code
 
     /** The byte at the current index. */
-    var pointee: UInt8 { return self.code[self.address] }
+    var pointee: UInt8 { self.code[self.address] }
 
     /**
      Create a "pointer" into the given array.
