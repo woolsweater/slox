@@ -7,7 +7,7 @@ struct Chunk
     private(set) var code: [UInt8] = []
 
     /** Storage for constant values used in this chunk. */
-    private(set) var constants: [Value] = []
+    private(set) var constants: [Value] = []    //TODO: This should be managed by Lox
 
     /**
      The lines in the original source code corresponding to each item
@@ -43,36 +43,33 @@ extension Chunk
     }
 
     /**
-     Add the given constant value, which corresponds to an item at `line` in
-     the original source, to the `Chunk`'s storage. Then write the appropriate
-     `OpCode` (using the long variant of the code that was passed, if needed) and
-     the index to the bytecode.
-     - returns: The index of the new constant, or `nil` if there are too many
-     constants already present in the chunk.
+     Add the given constant value, which corresponds to an item at `line` in the
+     original source, to the `Chunk`'s storage. Then write the appropriate
+     `OpCode` (using the long variant of the code that was passed, if needed)
+     and the index to the bytecode.
+     - returns: `false` if there are too many constants already present in the
+     chunk, else `true`.
      */
-    mutating func write(constant: Value, operation: OpCode, line: Int) -> Int?
+    mutating func write(constant: Value, operation: OpCode, line: Int) -> Bool
     {
         let index = self.add(constant: constant)
-        guard index <= Int.threeByteMax else { return nil }
+        guard index <= Int.threeByteMax else { return false }
 
         self.write(operation: operation, argument: index, line: line)
 
-        return index
+        return true
     }
 
     /**
-     Add a constant-manipulating `operation` to the bytecode, along with the
-     `argument` index that it should use.
-     The long variant of `operation` is used if needed.
+     Add an `operation` to the bytecode, along with the `argument` that it
+     should use. The long variant of `operation` is written if needed.
 
-     - precondition: `argument` must be an existing index to the `Chunk`'s
-     `constants`.
+     - remark: The target collection of the `argument` varies according to the
+     `operation` itself; in some cases it is the chunk's `constants` table, but
+     it may not be.
      */
     mutating func write(operation: OpCode, argument: Int, line: Int)
     {
-        precondition(self.constants.indices ~= argument,
-                     "Invalid constant address \(argument); only \(self.constants.count) items are present.")
-
         if argument <= UInt8.max {
             self.write(opCode: operation, line: line)
             self.write(byte: UInt8(argument), line: line)
@@ -143,7 +140,7 @@ private extension Array
 private extension Int
 {
     /** The highest value that can be stored in three bytes unsigned. */
-    static let threeByteMax = 16777215
+    static let threeByteMax = 0xff_ffff
 }
 
 private extension OpCode

@@ -19,8 +19,10 @@ class VM
     private var stack: RawStack<Value>
     /** All unique string values known to this interpretation context. */
     private var strings: HashTable
-    /** Variables that have been defined at global scope in this interpretation context. */
-    private var globals: HashTable
+    /**
+     Variables that have been defined at global scope in this interpretation context.
+     */
+    private var globals: GlobalVariables
 
     init()
     {
@@ -28,7 +30,7 @@ class VM
         self.allocator = allocator
         self.stack = RawStack<Value>(size: VM.stackMaxSize, allocator: allocator)
         self.strings = HashTable(manager: allocator)
-        self.globals = HashTable(manager: allocator)
+        self.globals = GlobalVariables(allocator: allocator)
     }
 
     deinit
@@ -49,7 +51,13 @@ extension VM
     /** Interpret the given source code, reporting whether an error occurred. */
     func interpret(source: String) -> InterpretResult
     {
-        let compiler = Compiler(source: source, stringsTable: self.strings, allocator: self.allocator)
+        let compiler = Compiler(
+            source: source,
+            stringsTable: self.strings,
+            globals: self.globals,
+            allocator: self.allocator
+        )
+
         guard let compiledChunk = compiler.compile() else {
             return .compileError
         }
@@ -92,22 +100,22 @@ extension VM
                         self.stack.push(constant)
                     case .defineGlobal:
                         let index = self.ip.advanceTakingInt()
-                        self.defineVariable(forNameAt: index)
+                        self.initializeGlobal(at: index)
                     case .defineGlobalLong:
                         let index = self.ip.advanceTakingThreeByteInt()
-                        self.defineVariable(forNameAt: index)
+                        self.initializeGlobal(at: index)
                     case .readGlobal:
                         let index = self.ip.advanceTakingInt()
-                        try self.readVariable(forNameAt: index)
+                        try self.readGlobal(at: index)
                     case .readGlobalLong:
                         let index = self.ip.advanceTakingThreeByteInt()
-                        try self.readVariable(forNameAt: index)
+                        try self.readGlobal(at: index)
                     case .setGlobal:
                         let index = self.ip.advanceTakingInt()
-                        try self.setValue(forNameAt: index)
+                        try self.setGlobal(at: index)
                     case .setGlobalLong:
                         let index = self.ip.advanceTakingThreeByteInt()
-                        try self.setValue(forNameAt: index)
+                        try self.setGlobal(at: index)
                     case .nil:
                         self.stack.push(.nil)
                     case .true:
@@ -161,11 +169,6 @@ extension VM
     }
 
     private struct BinaryOperandError : Error {}
-    private struct UndefinedVariable : Error
-    {
-        let name: StringRef
-        var renderedName: String { String(cString: self.name.chars) }
-    }
 
     private func concatenate() throws
     {
@@ -212,61 +215,30 @@ extension VM
     }
 
     /**
-     Get a variable name from the `Chunk`'s constants list at the given
-     index, and insert it into the `globals` table with the value at the
-     top of the stack.
+     Initialize the global storage at `index` with the value at the top
+     of the stack.
+     - remark: It is not an error to re-declare a global that has already
+     been initialized.
      */
-    private func defineVariable(forNameAt index: Int)
+    private func initializeGlobal(at index: Int)
     {
-        guard let name = self.variableNameConstant(at: index) else {
-            fatalError("Internal error: variable name lookup failed")
-        }
-
-        self.globals.insert(self.stack.peek(), for: name)
-        // Wait to pop until the hash table has stored the value in
-        // case the insert triggers garbage collection
+        let value = self.stack.peek()
+        self.globals.initialize(index, with: value)
+        // Wait to pop until we have stored the value, in
+        // case the store triggers garbage collection.
         _ = self.stack.pop()
     }
 
-    private func readVariable(forNameAt index: Int) throws
+    private func readGlobal(at index: Int) throws
     {
-        guard let name = self.variableNameConstant(at: index) else {
-            fatalError("Internal error: variable name lookup failed")
-        }
-
-        guard let value = self.globals.value(for: name) else {
-            throw UndefinedVariable(name: name)
-        }
-
+        let value = try self.globals.readValue(at: index)
         self.stack.push(value)
     }
 
-    private func setValue(forNameAt index: Int) throws
+    private func setGlobal(at index: Int) throws
     {
-        guard let name = self.variableNameConstant(at: index) else {
-            fatalError("Internal error: variable name lookup failed")
-        }
-
         let value = self.stack.peek()
-        guard !self.globals.insert(value, for: name) else {
-            // Clean up in case we're in a REPL context:
-            // Back out the name so that it remains undefined
-            self.globals.deleteValue(for: name)
-            // The stack will be cleaned up in the error handler
-            
-            throw UndefinedVariable(name: name)
-        }
-    }
-
-    private func variableNameConstant(at index: Int) -> StringRef?
-    {
-        let constant = self.chunk.constants[index]
-        guard constant.isObject(kind: .string) else {
-            assertionFailure("Cannot read variable name at constant offset \(index)")
-            return nil
-        }
-
-        return constant.object!.asStringRef()
+        try self.globals.storeValue(value, at: index)
     }
 
     //MARK:- Error reporting

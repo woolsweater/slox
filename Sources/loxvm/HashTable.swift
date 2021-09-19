@@ -1,7 +1,9 @@
 import Foundation
 import loxvm_object
 
-/** A hash table for use by the Lox runtime. */
+/**
+ A hash table for use by the Lox runtime, mapping `StringRef`s to `Value`s.
+ */
 class HashTable
 {
     enum Entry
@@ -187,6 +189,27 @@ extension HashTable
     }
 }
 
+extension HashTable : Sequence
+{
+    func makeIterator() -> AnyIterator<(StringRef, Value)>
+    {
+        var bufferIterator = self.buffer.makeIterator()
+        return AnyIterator({
+           while let next = bufferIterator.next() {
+               if case let .live(key: key, value: value) = next {
+                   return (key, value)
+               }
+               else {
+                   // Tombstone or empty slot
+                   continue
+               }
+           }
+
+           return nil
+       })
+    }
+}
+
 private extension HashTable
 {
     struct Size
@@ -199,7 +222,10 @@ private extension HashTable
     private var capacity: Int { self.entries?.count ?? 0 }
     private var maxiumumCount: Int { self.capacity.scaled(by: Size.maximumLoad) }
     private var needsExpansionOnInsertion: Bool { self.count + 1 > self.maxiumumCount }
-    private var expandedCapacity: Int { max(Size.minimumCapacity, self.capacity.scaled(by: Size.expansionFactor)) }
+    private var expandedCapacity: Int
+    {
+        Swift.max(Size.minimumCapacity, self.capacity.scaled(by: Size.expansionFactor))
+    }
 
     private func expand()
     {

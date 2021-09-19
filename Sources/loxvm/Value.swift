@@ -12,6 +12,14 @@ enum Value
 extension Value
 {
     /**
+     Convenience for creating a `Value.number` from an integer instead of a `Double`.
+     */
+    static func number<I : FixedWidthInteger>(_ integer: I) -> Value
+    {
+        return .number(Double(integer))
+    }
+
+    /**
      The value interpreted as a boolean: `nil` and `false` are "falsey"; everything
      else is "truthy".
      */
@@ -25,6 +33,15 @@ extension Value
             default:
                 return false
         }
+    }
+
+    /** If this value is a number, the wrapped value as an integer; else `nil`. */
+    var asInt: Int?
+    {
+        guard case let .number(n) = self else {
+            return nil
+        }
+        return Int(n)
     }
 
     /** If this value is an object, the wrapped `ObjectRef`, else `nil` */

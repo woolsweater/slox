@@ -15,28 +15,26 @@ enum OpCode : UInt8
     case constant, constantLong
 
     /**
-     Add a name to the current interpretation context's global variable
-     table. The operand is the index into the `constants` table where the
-     name is stored; the initial value is on the VM's stack.
-     - remark: The "long" variant means that the index is stored across the
-     next _three_ bytes, rather than one.
+     Initialize a global storage slot in the current interpretation context. The
+     operand is the index where the value is to be stored; the initial value is
+     on the VM's stack.
+     - remark: The "long" variant means that the index is stored across the next
+     _three_ bytes, rather than one.
      */
     case defineGlobal, defineGlobalLong
 
     /**
      Read a value from the current interpretation context's global variable
-     table. The operand is the index into the `constants` table where the
-     name is stored.
+     table. The operand is the index where the value is stored.
      - remark: The "long" variant means that the index is stored across the
      next _three_ bytes, rather than one.
      */
     case readGlobal, readGlobalLong
 
-    /**
-     Bind a new value to an existing variable in the current interpretation
-     context's global variable table. The operand is the index into the
-     `constants` table where the variable name is stored; the new value is
-     on the VM's stack.
+    /**     
+     Bind a new value to an existing global storage slot in the current
+     interpretation context. The operand is the index where the value is to be
+     stored; the new value is on the VM's stack.
      - remark: The "long" variant means that the index is stored across the
      next _three_ bytes, rather than one.
      */
@@ -54,6 +52,8 @@ enum OpCode : UInt8
     /** Arithmetic operators, with operands on the VM's stack. */
     case add, subtract, multiply, divide
 
-    /** The operation for an expression statement; it is evaluated and discarded. */
+    /**
+     The operation for an expression statement; it is evaluated and discarded.
+     */
     case pop
 }

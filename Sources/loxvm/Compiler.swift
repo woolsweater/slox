@@ -27,7 +27,7 @@ class Compiler
 
     private let scanner: Scanner
     private let strings: HashTable
-    private let identifiers: HashTable
+    private let globals: GlobalVariables
     private let allocator: MemoryManager
     private lazy var stringCompiler = StringCompiler(allocate: { [allocator] in allocator.allocateBuffer(of: UInt8.self, count: $0) },
                                                       destroy: { [allocator] in allocator.destroyBuffer($0) })
@@ -40,11 +40,14 @@ class Compiler
      Create a compiler to operate on the given source, obtaining any neccessary heap memory
      from the provided allocator.
      */
-    init(source: String, stringsTable: HashTable, allocator: MemoryManager)
+    init(source: String,
+         stringsTable: HashTable,
+         globals: GlobalVariables,
+         allocator: MemoryManager)
     {
         self.scanner = Scanner(source: source)
         self.strings = stringsTable
-        self.identifiers = HashTable(manager: allocator)
+        self.globals = globals
         self.allocator = allocator
     }
 }
@@ -178,18 +181,11 @@ extension Compiler
         }
         self.mustConsume(.semicolon, message: "Expected ';' to terminate variable declaration")
 
-        if case let .number(existingIndex)? = self.identifiers.value(for: name) {
-            self.chunk.write(operation: .defineGlobal,
-                              argument: Int(existingIndex),
-                                  line: declarationLine)
-        }
-        else {
-            let index = self.emitConstant(value: .object(name.asBaseRef()),
-                                      operation: .defineGlobal,
-                                           line: declarationLine)
-            guard let newIndex = index else { return }
-            self.identifiers.insert(.number(Double(newIndex)), for: name)
-        }
+        let index = self.globals.index(for: name)
+
+        self.chunk.write(operation: .defineGlobal,
+                          argument: index,
+                              line: declarationLine)
     }
 
     private func parseVariable(failureMessage: String) -> StringRef
@@ -321,9 +317,13 @@ extension Compiler
             operation = .readGlobal
         }
 
-        self.emitConstant(value: .object(name.asBaseRef()),
-                      operation: operation,
-                           line: identifierLine)
+        // It's okay if this doesn't exist yet: we could be in a function body
+        // that won't execute until after the global is defined.
+        let index = self.globals.index(for: name)
+
+        self.chunk.write(operation: operation,
+                          argument: index,
+                              line: identifierLine)
     }
 
     private func string()
@@ -378,17 +378,14 @@ extension Compiler
         self.emitBytes(for: .return)
     }
 
-    @discardableResult
-    private func emitConstant(value: Value, operation: OpCode = .constant, line: Int? = nil) -> Int?
+    private func emitConstant(value: Value, operation: OpCode = .constant, line: Int? = nil)
     {
-        let index = self.chunk.write(constant: value,
-                                    operation: operation,
-                                         line: line ?? self.previousToken.lineNumber)
-        if index == nil {
+        let success = self.chunk.write(constant: value,
+                                      operation: operation,
+                                           line: line ?? self.previousToken.lineNumber)
+        if !(success) {
             self.reportError(message: "Constant storage limit exceeded.")
         }
-
-        return index
     }
 
     private func emitBytes(for opCodes: OpCode..., line: Int? = nil)
