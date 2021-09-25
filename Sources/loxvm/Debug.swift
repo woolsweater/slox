@@ -2,88 +2,87 @@ import Foundation
 import loxvm_object
 
 /**
- Emit a human-readable representation of the given `Chunk`, with information
- about the opcodes and stored values.
- */
-func disassemble(_ chunk: Chunk, name: String)
-{
-    print("== \(name) ==")
-
-    var i = 0
-    while i < chunk.code.count {
-        i = disassembleInstruction(chunk, offset: i)
-    }
-}
-
-/**
  Emit a human-readable representation of the instruction at `offset` in
- the given `Chunk`, then return the offset of the next instruction.
+ the given `Chunk`, looking up values as needed in `globals` and `stack`.
  */
-@discardableResult
-func disassembleInstruction(_ chunk: Chunk, offset: Int) -> Int
+func disassembleInstruction(at offset: Int, in chunk: Chunk, globals: GlobalVariables, stack: RawStack<Value>)
 {
     print(String(format:"%04d", offset), terminator: " ")
 
     let lineNumber = chunk.lineNumber(forByteAt: offset)
     if offset > 0 && lineNumber == chunk.lineNumber(forByteAt: offset - 1) {
         // Continuation of a source line
-        print("   |", terminator: " ")
+        print("|    ", terminator: " ")
     }
     else {
         // New source line
-        print(String(format: "%04d", lineNumber), terminator: " ")
+        print(String(format: "L%04d", lineNumber), terminator: " ")
     }
 
     guard let instruction = OpCode(rawValue: chunk.code[offset]) else {
         print("Unknown opcode '\(chunk.code[offset])'")
-        return offset + 1
+        return
     }
 
-    if instruction.hasOperand {
-        return printOperandInstruction(instruction, at: offset, in: chunk)
+    if let argument = argument(for: instruction, at: offset, in: chunk.code) {
+        printArgumentInstruction(
+            instruction,
+            argument,
+            constants: chunk.constants,
+            globals: globals,
+            stack: stack
+        )
     }
     else {
-        return printSimpleInstruction(instruction, at: offset)
+        print(instruction.debugName)
     }
 }
 
-private func printSimpleInstruction(_ opCode: OpCode, at offset: Int) -> Int
+private func printArgumentInstruction(
+    _ opCode: OpCode,
+    _ argument: Int,
+    constants: [Value],
+    globals: GlobalVariables,
+    stack: RawStack<Value>
+)
 {
-    print(opCode.debugName)
-    return offset + opCode.byteSize
-}
-
-private func printOperandInstruction(_ opCode: OpCode,
-                                     at instructionOffset: Int,
-                                     in chunk: Chunk)
-    -> Int
-{
-    let index = calculateConstantIndex(for: opCode,
-                                startingAt: instructionOffset + 1,
-                                        in: chunk.code)
     let paddedName = opCode.debugName.padding(toLength: 16, withPad: " ", startingAt: 0)
-    print(String(format: "%@ %4d", paddedName, index), terminator: " ")
-    print("'\(chunk.constants[index].formatted())'")
+    print(String(format: "%@ %4d", paddedName, argument), terminator: " ")
 
-    return instructionOffset + opCode.byteSize
+    let argumentValue: Value
+    switch opCode {
+        case .constant, .constantLong:
+            argumentValue = constants[argument]
+        case .readGlobal, .readGlobalLong:
+            argumentValue = try! globals.readValue(at: argument)
+        case .setGlobal, .setGlobalLong,
+             .defineGlobal, .defineGlobalLong:
+            argumentValue = stack.peek()
+        default:
+            fatalError("Internal error: Not an argument instruction: \(opCode)")
+    }
+
+    print(argumentValue.formatted())
 }
 
-private func calculateConstantIndex(for opCode: OpCode,
-                                    startingAt operandOffset: Int,
-                                    in byteCode: [UInt8])
-    -> Int
+/**
+ If `opCode` is one that takes an argument, look at the following bytes and
+ return the argument index that they form. If `opCode` does not take an
+ argument, return `nil`.
+ */
+private func argument(for opCode: OpCode, at operandOffset: Int, in byteCode: [UInt8]) -> Int?
 {
-    let operandSize = opCode.byteSize - 1
-    if operandSize == 1 {
-        return Int(byteCode[operandOffset])
-    }
-    else {
-        assert(2...4 ~= operandSize)
-        return byteCode[operandOffset..<(operandOffset+operandSize)].withUnsafeBytes {
-            var int: UInt32 = 0
-            memcpy(&int, $0.baseAddress, operandSize)
-            return Int(CFSwapInt32LittleToHost(int))
-        }
+    let argumentOffset = operandOffset + 1
+    switch opCode {
+        case .constant, .defineGlobal, .readGlobal, .setGlobal:
+            return Int(byteCode[argumentOffset])
+        case .constantLong, .defineGlobalLong, .readGlobalLong, .setGlobalLong:
+            let argumentEnd = argumentOffset + 3
+            return byteCode[argumentOffset..<argumentEnd].loadInt()
+        case .return, .print, .nil, .true, .false, .not, .negate, .equal,
+             .greater, .less, .add, .subtract, .multiply,
+             .divide, .pop:
+            return nil
     }
 }
 
@@ -117,21 +116,17 @@ private extension OpCode
             case .pop: return "OP_POP"
         }
     }
+}
 
-    /**
-     The number of bytes the `OpCode` and its operand (if any) occupy.
-     */
-    var byteSize: Int
+private extension ArraySlice where Element == UInt8
+{
+    func loadInt() -> Int
     {
-        switch self {
-            case .constant, .defineGlobal, .readGlobal, .setGlobal:
-                return 2
-            case .constantLong, .defineGlobalLong, .readGlobalLong, .setGlobalLong:
-                return 4
-            default:
-                return 1
+        precondition(1...4 ~= self.count)
+        return self.withUnsafeBytes {
+            var int: UInt32 = 0
+            memcpy(&int, $0.baseAddress, self.count)
+            return Int(CFSwapInt32LittleToHost(int))
         }
     }
-
-    var hasOperand: Bool { self.byteSize > 1 }
 }

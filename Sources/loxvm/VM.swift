@@ -77,7 +77,12 @@ extension VM
             #if DEBUG_TRACE_EXECUTION
             print("        ")
             self.stack.printContents()
-            disassembleInstruction(self.chunk, offset: ip.address)
+            disassembleInstruction(
+                at: ip.address,
+                in: self.chunk,
+                globals: self.globals,
+                stack: self.stack
+            )
             #endif
 
             guard let opCode = self.ip.advanceTakingOpCode() else {

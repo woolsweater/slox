@@ -75,12 +75,6 @@ extension Compiler
     private func end()
     {
         self.emitReturn()
-
-        #if DEBUG_PRINT_CHUNK
-        if self.state == .normal {
-            disassemble(self.chunk, name: "generated_code")
-        }
-        #endif
     }
 
     /**
