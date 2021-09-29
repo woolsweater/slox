@@ -7,6 +7,8 @@ import loxvm_object
  */
 class Compiler
 {
+    private enum Limit { static let localCount = Int(UInt8.max) }
+
     /** Description of current parsing with regard to error tokens and reporting. */
     fileprivate enum State
     {
@@ -28,6 +30,9 @@ class Compiler
     private let scanner: Scanner
     private let strings: HashTable
     private let globals: GlobalVariables
+    private var localCount = 0
+    private var currentScope: Scope = .global
+    private let locals: UnsafeMutableBufferPointer<LocalVariable>
     private let allocator: MemoryManager
     private lazy var stringCompiler = StringCompiler(allocate: { [allocator] in allocator.allocateBuffer(of: UInt8.self, count: $0) },
                                                       destroy: { [allocator] in allocator.destroyBuffer($0) })
@@ -48,6 +53,7 @@ class Compiler
         self.scanner = Scanner(source: source)
         self.strings = stringsTable
         self.globals = globals
+        self.locals = allocator.allocateBuffer(count: Limit.localCount)
         self.allocator = allocator
     }
 }
@@ -143,6 +149,9 @@ extension Compiler
         if self.match(.print) {
             self.printStatement()
         }
+        else if self.match(.leftBrace) {
+            self.inScope(self.block)
+        }
         else {
             self.expressionStatement()
         }
@@ -155,6 +164,15 @@ extension Compiler
         self.emitBytes(for: .print)
     }
 
+    private func block()
+    {
+        while !self.check(.rightBrace) && !self.check(.EOF) {
+            self.declaration()
+        }
+
+        self.mustConsume(.rightBrace, message: "Expected '}' to terminate block")
+    }
+
     private func expressionStatement()
     {
         self.expression()
@@ -164,9 +182,11 @@ extension Compiler
 
     private func variableDeclaration()
     {
-        let name = self.parseVariable(failureMessage: "Expected a variable name")
+        let globalSlot = self.declareVarIdentifier(failureMessage: "Expected a variable name")
         let declarationLine = self.previousToken.lineNumber
 
+        // Emit code for the initializer expression _first_ so that
+        // the stack is set up for the definition.
         if self.match(.equal) {
             self.expression()
         }
@@ -175,17 +195,80 @@ extension Compiler
         }
         self.mustConsume(.semicolon, message: "Expected ';' to terminate variable declaration")
 
-        let index = self.globals.index(for: name)
-
-        self.chunk.write(operation: .defineGlobal,
-                          argument: index,
-                              line: declarationLine)
+        if let slot = globalSlot {
+            self.chunk.write(operation: .defineGlobal,
+                              argument: slot,
+                                  line: declarationLine)
+        }
+        else {
+            // No-op: locals are just slots on the stack
+        }
     }
 
-    private func parseVariable(failureMessage: String) -> StringRef
+    /**
+     Handle the identifier in a variable declaration, adding local or
+     global storage as appropriate.
+     - returns: A global storage index, or `nil` if this is a local
+     variable declaration.
+     */
+    private func declareVarIdentifier(failureMessage: String) -> Int?
     {
         self.mustConsume(.identifier, message: failureMessage)
-        return self.previousToken.lexeme.withCStringBuffer(self.copyOrInternString(_:))
+        switch self.currentScope {
+            case .global:
+                let name = self.previousToken.lexeme.withCStringBuffer(self.copyOrInternString(_:))
+                return self.globals.index(for: name)
+            case let .block(depth):
+                self.addLocal(at: depth)
+                return nil
+        }
+    }
+
+    private func addLocal(at depth: Int)
+    {
+        guard self.localCount < Limit.localCount else {
+            self.reportError(message: "Local variable limit exceeded")
+            return
+        }
+
+        let identifier = self.previousToken
+        guard !self.locals(at: depth).contains(where: { $0.name == identifier.lexeme }) else {
+            self.reportError(message: "Illegal redefinition of variable '\(identifier.lexeme)'")
+            return
+        }
+
+        self.locals[self.localCount] = LocalVariable(name: identifier.lexeme,
+                                                    depth: depth)
+        self.localCount += 1
+    }
+
+    private func inScope(_ body: () -> Void)
+    {
+        let depth = self.currentScope.increment()
+        body()
+
+        //TODO: What if this was just a "stack frame" that could be destroyed
+        // all at once? Is that too much like the dictionary-based impl from
+        // LoxLib?
+        for _ in self.locals(at: depth) {
+            self.emitBytes(for: .pop)
+            self.localCount -= 1
+        }
+
+        self.currentScope.decrement()
+    }
+
+    /**
+     Starting from the end of the `locals` list, return all those entries that
+     are at `depth`.
+     - warning: If the current depth is _higher_ than `depth`, no items will be
+     returned.
+     */
+    func locals(at depth: Int) -> Array<LocalVariable>
+    {
+        return self.locals[(0..<self.localCount)]
+            .reversed()
+            .prefix(while: { $0.depth == depth })
     }
 
     /**
@@ -287,6 +370,8 @@ extension Compiler
         }
     }
 
+    //MARK:- Variable references
+
     private func variable(_ canAssign: Bool)
     {
         self.namedVariable(canAssign)
@@ -294,9 +379,9 @@ extension Compiler
 
     private func namedVariable(_ canAssign: Bool)
     {
-        let name = self.previousToken.lexeme
-            .withCStringBuffer(self.copyOrInternString(_:))
         let identifierLine = self.previousToken.lineNumber
+
+        let (isLocal, index) = self.resolveVariableName(self.previousToken.lexeme)
 
         let operation: OpCode
         if self.match(.equal) {
@@ -305,20 +390,41 @@ extension Compiler
                                    message: "Invalid assignment target")
             }
             self.expression()
-            operation = .setGlobal
+            operation = isLocal ? .setLocal : .setGlobal
         }
         else {
-            operation = .readGlobal
+            operation = isLocal ? .readLocal : .readGlobal
         }
-
-        // It's okay if this doesn't exist yet: we could be in a function body
-        // that won't execute until after the global is defined.
-        let index = self.globals.index(for: name)
 
         self.chunk.write(operation: operation,
                           argument: index,
                               line: identifierLine)
     }
+
+    private func resolveVariableName(_ name: Substring) -> (local: Bool, slot: Int)
+    {
+        // Locals take priority and thus can shadow globals.
+        if let localIndex = self.resolveLocalVariable(for: name) {
+            return (true, localIndex)
+        }
+        else {
+            let interned = name.withCStringBuffer(self.copyOrInternString(_:))
+            // It's okay if this doesn't exist yet: we could be in a function body
+            // that won't execute until after the global is defined.
+            let globalIndex = self.globals.index(for: interned)
+            return (false, globalIndex)
+        }
+    }
+
+    private func resolveLocalVariable(for name: Substring) -> Int?
+    {
+        return self.locals[0..<self.localCount].lazy
+            .enumerated()
+            .reversed()
+            .first(where: { (pair) in pair.1.name == name })?.0
+    }
+
+    //MARK:- Strings
 
     private func string()
     {

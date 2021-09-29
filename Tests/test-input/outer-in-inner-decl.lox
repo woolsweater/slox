@@ -1,8 +1,8 @@
 var a = 1;
 {
-    var a = 1 + 2;    // was a + 2; shadowing is now illegal
-    print a;    // output: 3
+    var a = 1 + 2;    // was a + 2; now illegal
+    print a;    //EXPECT: 3
     a = a + 3;
-    print a;    // output: 6
+    print a;    //EXPECT: 6
 }
-print a;    // output: 1
+print a;    //EXPECT: 1

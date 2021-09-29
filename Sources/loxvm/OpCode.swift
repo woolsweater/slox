@@ -31,7 +31,7 @@ enum OpCode : UInt8
      */
     case readGlobal, readGlobalLong
 
-    /**     
+    /**
      Bind a new value to an existing global storage slot in the current
      interpretation context. The operand is the index where the value is to be
      stored; the new value is on the VM's stack.
@@ -39,6 +39,19 @@ enum OpCode : UInt8
      next _three_ bytes, rather than one.
      */
     case setGlobal, setGlobalLong
+
+    /**
+     Read a local variable from its position on the stack. The operand is the
+     index where the value is stored.
+     */
+    case readLocal
+
+    /**
+     Bind a new value to an existing local storage slot on the stack. The
+     operand is the index where the value is to be stored; the new value is at
+     the top of the stack.
+     */
+    case setLocal
 
     /** Built-in literal values */
     case `nil`, `true`, `false`

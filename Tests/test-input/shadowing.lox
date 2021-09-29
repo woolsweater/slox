@@ -6,14 +6,14 @@ var c = "global c";
   var b = "outer b";
   {
     var a = "inner a";
-    print a;
-    print b;
-    print c;
+    print a;    //EXPECT: "inner a"
+    print b;    //EXPECT: "outer b"
+    print c;    //EXPECT: "global c"
   }
-  print a;
-  print b;
-  print c;
+  print a;    //EXPECT: "outer a"
+  print b;    //EXPECT: "outer b"
+  print c;    //EXPECT: "global c"
 }
-print a;
-print b;
-print c;
+print a;    //EXPECT: "global a"
+print b;    //EXPECT: "global b"
+print c;    //EXPECT: "global c"

@@ -1,5 +1,6 @@
 var a = 10;
 var b = a;
 a = 12;
-print a;
-print b;
+print a;    //EXPECT: 12
+print b;    //EXPECT: 10
+

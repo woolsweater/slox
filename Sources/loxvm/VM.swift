@@ -121,6 +121,16 @@ extension VM
                     case .setGlobalLong:
                         let index = self.ip.advanceTakingThreeByteInt()
                         try self.setGlobal(at: index)
+                    case .readLocal:
+                        let index = self.ip.advanceTakingInt()
+                        let value = self.stack[localSlot: index]
+                        // Copy the value to the top of the stack so the next
+                        // instruction can read it.
+                        self.stack.push(value)
+                    case .setLocal:
+                        let index = self.ip.advanceTakingInt()
+                        let value = self.stack.peek()
+                        self.stack[localSlot: index] = value
                     case .nil:
                         self.stack.push(.nil)
                     case .true:

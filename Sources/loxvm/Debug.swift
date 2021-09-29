@@ -2,8 +2,9 @@ import Foundation
 import loxvm_object
 
 /**
- Emit a human-readable representation of the instruction at `offset` in
- the given `Chunk`, looking up values as needed in `globals` and `stack`.
+ Emit a human-readable representation of the instruction at `offset` in the
+ given `Chunk`, looking up values as needed in `globals`, `chunk.constants`, and
+ `stack`.
  */
 func disassembleInstruction(at offset: Int, in chunk: Chunk, globals: GlobalVariables, stack: RawStack<Value>)
 {
@@ -38,6 +39,14 @@ func disassembleInstruction(at offset: Int, in chunk: Chunk, globals: GlobalVari
     }
 }
 
+/**
+ Render the name, raw argument (a storage index), and actual operand value for
+ `opCode`, which must be an instruction that takes an argument.
+ - remark: The interpretation of the argument index and value depend on the
+ particular instruction -- the storage location may be `constants`, `globals`,
+ or the `stack`. For reads the arugment is the value currently stored; for
+ writes/definitions it is the new incoming value
+ */
 private func printArgumentInstruction(
     _ opCode: OpCode,
     _ argument: Int,
@@ -58,6 +67,10 @@ private func printArgumentInstruction(
         case .setGlobal, .setGlobalLong,
              .defineGlobal, .defineGlobalLong:
             argumentValue = stack.peek()
+        case .readLocal:
+            argumentValue = stack[localSlot: argument]
+        case .setLocal:
+            argumentValue = stack.peek()
         default:
             fatalError("Internal error: Not an argument instruction: \(opCode)")
     }
@@ -74,7 +87,9 @@ private func argument(for opCode: OpCode, at operandOffset: Int, in byteCode: [U
 {
     let argumentOffset = operandOffset + 1
     switch opCode {
-        case .constant, .defineGlobal, .readGlobal, .setGlobal:
+        case .constant, .defineGlobal,
+             .readGlobal, .setGlobal,
+             .readLocal, .setLocal:
             return Int(byteCode[argumentOffset])
         case .constantLong, .defineGlobalLong, .readGlobalLong, .setGlobalLong:
             let argumentEnd = argumentOffset + 3
@@ -88,6 +103,7 @@ private func argument(for opCode: OpCode, at operandOffset: Int, in byteCode: [U
 
 private extension OpCode
 {
+    /** Human-readable string for this instruction. */
     var debugName: String
     {
         switch self {
@@ -101,6 +117,8 @@ private extension OpCode
             case .readGlobalLong: return "OP_READ_GLOBAL_LONG"
             case .setGlobal: return "OP_SET_GLOBAL"
             case .setGlobalLong: return "OP_SET_GLOBAL_LONG"
+            case .readLocal: return "OP_READ_LOCAL"
+            case .setLocal: return "OP_SET_LOCAL"
             case .nil: return "OP_NIL"
             case .true: return "OP_TRUE"
             case .false: return "OP_FALSE"
@@ -120,6 +138,10 @@ private extension OpCode
 
 private extension ArraySlice where Element == UInt8
 {
+    /**
+     Take the next `count` bytes as the raw contents of a little-endian integer
+     and return that value.
+     */
     func loadInt() -> Int
     {
         precondition(1...4 ~= self.count)

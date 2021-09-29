@@ -52,12 +52,42 @@ struct RawStack<Element>
         self.top = self.buffer.baseAddress!
     }
 
-    /** Return the value at the given distance from the top of the stack, keeping it in place. */
+    /**
+     Return the value at the given distance from the top of the stack, keeping
+     it in place.
+     */
     func peek(distance: Int = 0) -> Element
     {
         let address = self.top - 1 - distance
-        assert(address >= self.buffer.baseAddress!)
+        precondition(address >= self.buffer.baseAddress!)
         return address.pointee
+    }
+
+    /**
+     Treating the stack as an array where 0 is the _bottom_, access the value
+     at index `i`.
+     - remark: This is required for access to local variables, which are pushed
+     first in the stack for any given scope.
+     */
+    subscript (localSlot i: Int) -> Element
+    {
+        get {
+            let address = self.address(at: i)
+            return address.pointee
+        }
+        set {
+            let address = self.address(at: i)
+            address.pointee = newValue
+        }
+    }
+
+    /** The storage location `i` places from the start of `buffer`. */
+    private func address(at i: Int) -> UnsafeMutablePointer<Element>
+    {
+        precondition(i >= 0)
+        let address = self.buffer.baseAddress! + i
+        precondition(address < self.top)
+        return address        
     }
 }
 
