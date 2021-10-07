@@ -2,8 +2,8 @@ import Foundation
 import loxvm_object
 
 /**
- Translator from a token stream to bytecode stored in a `Chunk`, using a `Scanner` as a helper
- to get tokens from the provided source.
+ Translator from a token stream to bytecode stored in a `Chunk`, using a
+ `Scanner` as a helper to get tokens from the provided source.
  */
 class Compiler
 {
@@ -30,9 +30,8 @@ class Compiler
     private let scanner: Scanner
     private let strings: HashTable
     private let globals: GlobalVariables
-    private var localCount = 0
+    private var locals: LocalVariables
     private var currentScope: Scope = .global
-    private let locals: UnsafeMutableBufferPointer<LocalVariable>
     private let allocator: MemoryManager
     private lazy var stringCompiler = StringCompiler(allocate: { [allocator] in allocator.allocateBuffer(of: UInt8.self, count: $0) },
                                                       destroy: { [allocator] in allocator.destroyBuffer($0) })
@@ -42,8 +41,8 @@ class Compiler
     private var chunk: Chunk = Chunk()
 
     /**
-     Create a compiler to operate on the given source, obtaining any neccessary heap memory
-     from the provided allocator.
+     Create a compiler to operate on the given source, obtaining any neccessary
+     heap memory from the provided allocator.
      */
     init(source: String,
          stringsTable: HashTable,
@@ -53,7 +52,7 @@ class Compiler
         self.scanner = Scanner(source: source)
         self.strings = stringsTable
         self.globals = globals
-        self.locals = allocator.allocateBuffer(count: Limit.localCount)
+        self.locals = LocalVariables(capacity: Limit.localCount)
         self.allocator = allocator
     }
 }
@@ -206,10 +205,10 @@ extension Compiler
     }
 
     /**
-     Handle the identifier in a variable declaration, adding local or
-     global storage as appropriate.
-     - returns: A global storage index, or `nil` if this is a local
-     variable declaration.
+     Handle the identifier in a variable declaration, adding local or global
+     storage as appropriate.
+     - returns: A global storage index, or `nil` if this is a local variable
+     declaration.
      */
     private func declareVarIdentifier(failureMessage: String) -> Int?
     {
@@ -226,20 +225,15 @@ extension Compiler
 
     private func addLocal(at depth: Int)
     {
-        guard self.localCount < Limit.localCount else {
-            self.reportError(message: "Local variable limit exceeded")
+        let name = self.previousToken.lexeme
+        guard !(self.locals.currentFrame(ifAt: depth).contains(where: { $0.name == name })) else {
+            self.reportError(message: "Illegal redefinition of variable '\(name)'")
             return
         }
 
-        let identifier = self.previousToken
-        guard !self.locals(at: depth).contains(where: { $0.name == identifier.lexeme }) else {
-            self.reportError(message: "Illegal redefinition of variable '\(identifier.lexeme)'")
-            return
-        }
-
-        self.locals[self.localCount] = LocalVariable(name: identifier.lexeme,
-                                                    depth: depth)
-        self.localCount += 1
+        let local = LocalVariables.Entry(name: name, depth: depth)
+        do { try self.locals.append(local) }
+        catch { self.reportError(message: "Local variable limit exceeded") }
     }
 
     private func inScope(_ body: () -> Void)
@@ -247,28 +241,12 @@ extension Compiler
         let depth = self.currentScope.increment()
         body()
 
-        //TODO: What if this was just a "stack frame" that could be destroyed
-        // all at once? Is that too much like the dictionary-based impl from
-        // LoxLib?
-        for _ in self.locals(at: depth) {
+        for _ in 0..<(self.locals.popFrame(at: depth)) {
+            //TODO: Add `OpCode.popFrame` that takes an operand for the number
+            // of pops; or even better, also add `pop(_ n: Int)` to `RawStack`.
             self.emitBytes(for: .pop)
-            self.localCount -= 1
         }
-
         self.currentScope.decrement()
-    }
-
-    /**
-     Starting from the end of the `locals` list, return all those entries that
-     are at `depth`.
-     - warning: If the current depth is _higher_ than `depth`, no items will be
-     returned.
-     */
-    func locals(at depth: Int) -> Array<LocalVariable>
-    {
-        return self.locals[(0..<self.localCount)]
-            .reversed()
-            .prefix(while: { $0.depth == depth })
     }
 
     /**
@@ -401,10 +379,10 @@ extension Compiler
                               line: identifierLine)
     }
 
-    private func resolveVariableName(_ name: Substring) -> (local: Bool, slot: Int)
+    private func resolveVariableName(_ name: Substring) -> (isLocal: Bool, slot: Int)
     {
         // Locals take priority and thus can shadow globals.
-        if let localIndex = self.resolveLocalVariable(for: name) {
+        if let localIndex = self.locals.resolve(name) {
             return (true, localIndex)
         }
         else {
@@ -414,14 +392,6 @@ extension Compiler
             let globalIndex = self.globals.index(for: interned)
             return (false, globalIndex)
         }
-    }
-
-    private func resolveLocalVariable(for name: Substring) -> Int?
-    {
-        return self.locals[0..<self.localCount].lazy
-            .enumerated()
-            .reversed()
-            .first(where: { (pair) in pair.1.name == name })?.0
     }
 
     //MARK:- Strings

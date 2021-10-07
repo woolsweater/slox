@@ -1,30 +1,14 @@
-/** Compile-time record for a local variable. */
-struct LocalVariable
-{
-    /** The text of the variable's identifier. */
-    let name: Substring
-
-    /**
-     The count of scopes enclosing the variable.
-     - remark: Corresponds to the compiler's scope at the time
-     the variable is defined.
-     */
-    let depth: Int
-}
-
 /**
- The level of nesting during compilation, for purposes of variable
- definition.
+ The level of nesting during compilation, for purposes of variable definition.
  */
 enum Scope
 {
     /** Top-level, outside of any function or other block. */
     case global
-    
+
     /**
      Nested in the given number of functions or other blocks.
-     - remark: The first scope after `.global` is `.block(1)`,
-     not `.block(0)`.
+     - remark: The first scope after `.global` is `.block(1)`, not `.block(0)`.
      */
     case block(Int)
 }
@@ -46,6 +30,7 @@ extension Scope
         }
 
         self = .block(newDepth)
+
         return newDepth
     }
 

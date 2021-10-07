@@ -1,8 +1,20 @@
-var a = 10;
-var b = -12;
-print a + b;
-
-var song = "Daisy, Daisy, give me your answer, do
-I'm half crazy, all for the love of you";
-
-print song;
+{
+  var a = 10;
+  {
+    var b = -12;
+  
+    {
+      var song = "Daisy, Daisy, give me your answer, do
+                  I'm half crazy, all for the love of you";
+      
+      {
+        {
+          print a + b;
+          {
+            print song;
+          }
+        }
+      }
+    }
+  }
+}
