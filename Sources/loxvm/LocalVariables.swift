@@ -13,11 +13,12 @@ struct LocalVariables
         let name: Substring
 
         /**
-         The count of block scopes enclosing the variable.
-         - remark: Corresponds to the compiler's `Scope` at the time
-         the variable is defined.
+         The count of block scopes enclosing the variable. Until the variable's
+         initializer expression has been compiled, this will be `nil`. Then it
+         will be set to correspond to the compiler's `Scope` at the time the
+         variable is defined.
          */
-        let depth: Int
+        var depth: Int?
     }
 
     /**
@@ -25,6 +26,12 @@ struct LocalVariables
      compilation context.
      */
     struct OutOfStorage : Error {}
+
+    /**
+     An error produced when trying to resolve a variable name that doesn't yet
+     have a valid `depth.`
+     */
+    struct UninitializedVariable : Error {}
 
     // var only so we can `assert(isKnownUniquelyReferenced)`
     private var storage: Storage
@@ -68,6 +75,13 @@ extension LocalVariables
         try self.storage.append(variable)
     }
 
+    /** Update the most recent entry's `depth` from `nil` to the given value. */
+    mutating func markLastInitialized(with depth: Int)
+    {
+        assert(isKnownUniquelyReferenced(&self.storage), "Need CoW support")
+        self.storage.updateLast({ $0.depth = depth })
+    }
+
     /**
      Starting from the end of the list, return all entries with the given
      `depth`.
@@ -82,19 +96,29 @@ extension LocalVariables
             return entries.reversed().prefix(while: { $0.depth == depth })
         }
     }
-    
+
     /**
      Starting from the most recently added variable, search backwards for
      `name`.
      - returns: The index corresponding to the most recent entry matching
-     `name`, or `nil` if `name` is not found.
+     `name`, or `nil` if `name` is not found. But if the entry is unintialized
+     (its `depth` is `nil`), return an error.
      */
-    func resolve(_ name: Substring) -> Int?
+    func resolve(_ name: Substring) -> Result<Int?, UninitializedVariable>
     {
         return self.storage.withEntries { (entries) in
-            entries.lazy.enumerated()
+            let match = entries.lazy.enumerated()
                 .reversed()
-                .first(where: { $0.element.name == name })?.offset
+                .first(where: { $0.element.name == name })
+
+            switch match {
+                case .none:
+                    return .success(nil)
+                case let .some(entry) where entry.element.depth == nil:
+                    return .failure(UninitializedVariable())
+                case let .some(entry):
+                    return .success(entry.offset)
+            }
         }
     }
 }
@@ -123,6 +147,15 @@ private extension LocalVariables
             return self.withUnsafeMutablePointers { (header, base) in
                 let entries = UnsafeBufferPointer(start: base, count: header.pointee)
                 return query(entries)
+            }
+        }
+
+        func updateLast(_ mutation: (inout Entry) -> Void)
+        {
+            self.withUnsafeMutablePointers { (header, base) in
+                let lastIndex = header.pointee - 1
+                precondition(lastIndex >= 0, "Cannot mutate empty 'LocalVariables'")
+                mutation(&(base + lastIndex).pointee)
             }
         }
 

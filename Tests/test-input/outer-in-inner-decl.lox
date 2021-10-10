@@ -1,8 +1,4 @@
 var a = 1;
 {
-    var a = 1 + 2;    // was a + 2; now illegal
-    print a;    //EXPECT: 3
-    a = a + 3;
-    print a;    //EXPECT: 6
+  var a = a + 2;  //EXPECT: error: at 'a' Cannot access variable 'a' in its own initializer.
 }
-print a;    //EXPECT: 1

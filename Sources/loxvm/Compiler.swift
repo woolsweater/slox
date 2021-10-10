@@ -181,7 +181,7 @@ extension Compiler
 
     private func variableDeclaration()
     {
-        let globalSlot = self.declareVarIdentifier(failureMessage: "Expected a variable name")
+        let (isGlobal, place) = self.declareVarIdentifier(failureMessage: "Expected a variable name")
         let declarationLine = self.previousToken.lineNumber
 
         // Emit code for the initializer expression _first_ so that
@@ -194,32 +194,33 @@ extension Compiler
         }
         self.mustConsume(.semicolon, message: "Expected ';' to terminate variable declaration")
 
-        if let slot = globalSlot {
+        if isGlobal {
             self.chunk.write(operation: .defineGlobal,
-                              argument: slot,
+                              argument: place,
                                   line: declarationLine)
         }
         else {
-            // No-op: locals are just slots on the stack
+            self.locals.markLastInitialized(with: place)
+            // No bytecode to emit; locals are just slots on the stack.
         }
     }
 
     /**
      Handle the identifier in a variable declaration, adding local or global
      storage as appropriate.
-     - returns: A global storage index, or `nil` if this is a local variable
-     declaration.
+     - returns: If a global, the global's storage index; for a local, the `depth`
+     of the current scope.
      */
-    private func declareVarIdentifier(failureMessage: String) -> Int?
+    private func declareVarIdentifier(failureMessage: String) -> (isGlobal: Bool, place: Int)
     {
         self.mustConsume(.identifier, message: failureMessage)
         switch self.currentScope {
             case .global:
                 let name = self.previousToken.lexeme.withCStringBuffer(self.copyOrInternString(_:))
-                return self.globals.index(for: name)
+                return (true, self.globals.index(for: name))
             case let .block(depth):
                 self.addLocal(at: depth)
-                return nil
+                return (false, depth)
         }
     }
 
@@ -231,7 +232,7 @@ extension Compiler
             return
         }
 
-        let local = LocalVariables.Entry(name: name, depth: depth)
+        let local = LocalVariables.Entry(name: name, depth: nil)
         do { try self.locals.append(local) }
         catch { self.reportError(message: "Local variable limit exceeded") }
     }
@@ -382,15 +383,18 @@ extension Compiler
     private func resolveVariableName(_ name: Substring) -> (isLocal: Bool, slot: Int)
     {
         // Locals take priority and thus can shadow globals.
-        if let localIndex = self.locals.resolve(name) {
-            return (true, localIndex)
-        }
-        else {
-            let interned = name.withCStringBuffer(self.copyOrInternString(_:))
-            // It's okay if this doesn't exist yet: we could be in a function body
-            // that won't execute until after the global is defined.
-            let globalIndex = self.globals.index(for: interned)
-            return (false, globalIndex)
+        switch self.locals.resolve(name) {
+            case .failure(_):
+                self.reportError(message: "Cannot access variable '\(name)' in its own initializer.")
+                return (true, 0)  // Will never be executed
+            case let .success(.some(localIndex)):
+                return (true, localIndex)
+            case .success(nil):
+                let interned = name.withCStringBuffer(self.copyOrInternString(_:))
+                // It's okay if this doesn't exist yet: we could be in a function body
+                // that won't execute until after the global is defined.
+                let globalIndex = self.globals.index(for: interned)
+                return (false, globalIndex)
         }
     }
 

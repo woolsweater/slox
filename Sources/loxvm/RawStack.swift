@@ -81,12 +81,15 @@ struct RawStack<Element>
         }
     }
 
-    /** The storage location `i` places from the start of `buffer`. */
+    /**
+     The storage location `i` places from the start of `buffer` (which is the
+     bottom of the stack).
+     */
     private func address(at i: Int) -> UnsafeMutablePointer<Element>
     {
         precondition(i >= 0)
         let address = self.buffer.baseAddress! + i
-        precondition(address < self.top)
+        precondition(address < self.top, "Internal error: attempt to access invalid stack slot \(i)")
         return address        
     }
 }
