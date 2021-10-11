@@ -100,18 +100,25 @@ extension LocalVariables
     /**
      Starting from the most recently added variable, search backwards for
      `name`.
-     - returns: The index corresponding to the most recent *initialized* entry
-     matching `name` (`depth` is not `nil`), or `nil` if no valid candidate is
-     found.
+     - returns: The index corresponding to the most recent entry matching
+     `name`, or `nil` if `name` is not found. But if the entry is unintialized
+     (its `depth` is `nil`), return an error.
      */
-    func resolve(_ name: Substring) -> Int?
+    func resolve(_ name: Substring) -> Result<Int?, UninitializedVariable>
     {
         return self.storage.withEntries { (entries) in
             let match = entries.lazy.enumerated()
                 .reversed()
-                .first(where: { $0.element.name == name && $0.element.depth != nil })
+                .first(where: { $0.element.name == name })
 
-            return match?.offset
+            switch match {
+                case .none:
+                    return .success(nil)
+                case let .some(entry) where entry.element.depth == nil:
+                    return .failure(UninitializedVariable())
+                case let .some(entry):
+                    return .success(entry.offset)
+            }
         }
     }
 }
