@@ -1,4 +1,12 @@
 var a = 1;
 {
-  var a = a + 2;  //EXPECT: error: at 'a' Cannot access variable 'a' in its own initializer.
+  var a = a + 2;
+
+  {
+    var a = a + 3;
+    print(a);  //EXPECT: 6
+  }
+
+  print(a);  //EXPECT: 3
 }
+print(a);  //EXPECT: 1

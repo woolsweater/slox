@@ -383,18 +383,15 @@ extension Compiler
     private func resolveVariableName(_ name: Substring) -> (isLocal: Bool, slot: Int)
     {
         // Locals take priority and thus can shadow globals.
-        switch self.locals.resolve(name) {
-            case .failure(_):
-                self.reportError(message: "Cannot access variable '\(name)' in its own initializer.")
-                return (true, 0)  // Will never be executed
-            case let .success(.some(localIndex)):
-                return (true, localIndex)
-            case .success(nil):
-                let interned = name.withCStringBuffer(self.copyOrInternString(_:))
-                // It's okay if this doesn't exist yet: we could be in a function body
-                // that won't execute until after the global is defined.
-                let globalIndex = self.globals.index(for: interned)
-                return (false, globalIndex)
+        if let localIndex = self.locals.resolve(name) {
+            return (true, localIndex)
+        }
+        else {
+            let interned = name.withCStringBuffer(self.copyOrInternString(_:))
+            // It's okay if this doesn't exist yet: we could be in a function body
+            // that won't execute until after the global is defined.
+            let globalIndex = self.globals.index(for: interned)
+            return (false, globalIndex)
         }
     }
 
