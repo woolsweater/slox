@@ -58,12 +58,12 @@ private func printArgumentInstruction(
     let paddedName = opCode.debugName.padding(toLength: 16, withPad: " ", startingAt: 0)
     print(String(format: "%@ %4d", paddedName, argument), terminator: " ")
 
-    let argumentValue: Value
+    let argumentValue: Value?
     switch opCode {
         case .constant, .constantLong:
             argumentValue = constants[argument]
         case .readGlobal, .readGlobalLong:
-            argumentValue = try! globals.readValue(at: argument)
+            argumentValue = try? globals.readValue(at: argument)
         case .setGlobal, .setGlobalLong,
              .defineGlobal, .defineGlobalLong:
             argumentValue = stack.peek()
@@ -75,7 +75,8 @@ private func printArgumentInstruction(
             fatalError("Internal error: Not an argument instruction: \(opCode)")
     }
 
-    print(argumentValue.formatted())
+    let argumentDescription = argumentValue?.formatted() ?? "«uninitialized»"
+    print(argumentDescription)
 }
 
 /**
