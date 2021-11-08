@@ -430,6 +430,29 @@ extension Compiler
         }
     }
 
+    private func logical()
+    {
+        let jumpOp: OpCode
+        let precedence: ParseRule.Precedence
+        switch self.previousToken.kind {
+            case .and:
+                jumpOp = .jumpIfFalse
+                precedence = .and
+            case .or:
+                jumpOp = .jumpIfTrue
+                precedence = .or
+            default:
+                fatalError("Not a logical operator: \(self.previousToken.kind)")
+        }
+
+        let endJump = self.emitJump(jumpOp)
+
+        self.emitBytes(for: .pop)
+        self.parse(fromPrecedence: precedence)
+
+        self.patchJump(at: endJump)
+    }
+
     //MARK:- Variable references
 
     private func variable(_ canAssign: Bool)
@@ -675,7 +698,7 @@ private extension Compiler
             case .identifier   : return ParseRule(prefix: self.variable, infix: nil, precedence: .none)
             case .string       : return ParseRule(nonassigningPrefix: self.string, infix: nil, precedence: .none)
             case .number       : return ParseRule(nonassigningPrefix: self.number, infix: nil, precedence: .none)
-            case .and          : return ParseRule(prefix: nil, infix: nil, precedence: .and)
+            case .and          : return ParseRule(prefix: nil, infix: self.logical, precedence: .and)
             case .break        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .class        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .else         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
@@ -684,7 +707,7 @@ private extension Compiler
             case .fun          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .if           : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .nil          : return ParseRule(nonassigningPrefix: self.literal, infix: nil, precedence: .none)
-            case .or           : return ParseRule(prefix: nil, infix: nil, precedence: .or)
+            case .or           : return ParseRule(prefix: nil, infix: self.logical, precedence: .or)
             case .print        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .return       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .super        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
