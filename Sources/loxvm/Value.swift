@@ -35,6 +35,12 @@ extension Value
         }
     }
 
+    /**
+     The value interpreted as a boolean: `nil` and `false` are "falsey"; everything
+     else is "truthy".
+     */
+    var isTruthy: Bool { !self.isFalsey }
+
     /** If this value is a number, the wrapped value as an integer; else `nil`. */
     var asInt: Int?
     {

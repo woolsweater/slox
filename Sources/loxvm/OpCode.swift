@@ -55,11 +55,11 @@ enum OpCode : UInt8
 
     /**
      Read the top value of the stack and move the instruction pointer if it is
-     false. The operand, which is stored across the next three bytes, is the
-     count of bytes to jump by.
+     true or false respectively. The operand, which is stored across the next
+     three bytes, is the count of bytes to jump by.
      - remark: The stack value is left in place, not popped.
      */
-    case jumpIfFalse
+    case jumpIfTrue, jumpIfFalse
 
     /**
      Move the instruction pointer unconditionally. The operand, which is stored

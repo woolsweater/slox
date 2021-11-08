@@ -151,8 +151,8 @@ extension Compiler
         else if self.match(.leftBrace) {
             self.inScope(self.block)
         }
-        else if self.match(.if) {
-            self.ifStatement()
+        else if self.match(.if) || self.match(.unless) {
+            self.ifStatement(inverted: self.previousToken.kind == .unless)
         }
         else {
             self.expressionStatement()
@@ -175,13 +175,13 @@ extension Compiler
         self.mustConsume(.rightBrace, message: "Expected '}' to terminate block")
     }
 
-    private func ifStatement()
+    private func ifStatement(inverted: Bool)
     {
         //      ┌─────────────────────────┐
         //      │ Expression (peek stack) │
         //      └─┬───────────────────────┘
         //      ┌─▼───┐
-        // False┤ JiF │
+        // False┤ JiF │  (reversed for 'unless')
         //    │ └─┬───┘
         //    │   │ True
         //    │  ┌▼────┐
@@ -203,11 +203,11 @@ extension Compiler
         //       │ (continue) ◀──┘
         //       └────────────┘
 
-        self.mustConsume(.leftParen, message: "Expected '(' for 'if' condition")
+        self.mustConsume(.leftParen, message: "Expected '(' for '\(inverted ? "unless" : "if")' condition")
         self.expression()
-        self.mustConsume(.rightParen, message: "Expected ')' for 'if' condition")
+        self.mustConsume(.rightParen, message: "Expected ')' for '\(inverted ? "unless" : "if")' condition")
 
-        let thenBranch = self.emitJump(.jumpIfFalse)
+        let thenBranch = self.emitJump(inverted ? .jumpIfTrue : .jumpIfFalse)
         self.emitBytes(for: .pop)
 
         self.statement()
@@ -217,6 +217,9 @@ extension Compiler
         self.patchJump(at: thenBranch)
 
         if self.match(.else) {
+            guard !(inverted) else {
+                return self.reportError(message: "'unless' statement cannot have an 'else' clause.")
+            }
             self.statement()
         }
 
@@ -230,7 +233,7 @@ extension Compiler
      */
     private func emitJump(_ opCode: OpCode) -> Int
     {
-        assert([.jumpIfFalse, .jump].contains(opCode))
+        assert([.jumpIfTrue, .jumpIfFalse, .jump].contains(opCode), "Not a jump opcode: '\(opCode)'")
         self.emitBytes(for: opCode)
         let location = self.chunk.code.count
         for _ in 0..<OpCode.jumpOperandSize {

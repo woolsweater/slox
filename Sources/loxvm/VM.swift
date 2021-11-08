@@ -131,6 +131,11 @@ extension VM
                         let index = self.ip.advanceTakingInt()
                         let value = self.stack.peek()
                         self.stack[localSlot: index] = value
+                    case .jumpIfTrue:
+                        let offset = self.ip.advanceTakingThreeByteInt()
+                        if self.stack.peek().isTruthy {
+                            self.ip += offset
+                        }
                     case .jumpIfFalse:
                         let offset = self.ip.advanceTakingThreeByteInt()
                         if self.stack.peek().isFalsey {

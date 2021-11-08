@@ -95,7 +95,7 @@ private func argument(for opCode: OpCode, at operandOffset: Int, in byteCode: [U
         case .constantLong, .defineGlobalLong, .readGlobalLong, .setGlobalLong:
             let argumentEnd = argumentOffset + OpCode.longOperandSize
             return byteCode[argumentOffset..<argumentEnd].loadInt()
-        case .jumpIfFalse, .jump:
+        case .jumpIfTrue, .jumpIfFalse, .jump:
             let argumentEnd = argumentOffset + OpCode.jumpOperandSize
             return byteCode[argumentOffset..<argumentEnd].loadInt()
         case .return, .print, .nil, .true, .false, .not, .negate, .equal,
@@ -123,6 +123,7 @@ private extension OpCode
             case .setGlobalLong: return "OP_SET_GLOBAL_LONG"
             case .readLocal: return "OP_READ_LOCAL"
             case .setLocal: return "OP_SET_LOCAL"
+            case .jumpIfTrue: return "OP_JUMP_TRUE"
             case .jumpIfFalse: return "OP_JUMP_FALSE"
             case .jump: return "OP_JUMP"
             case .nil: return "OP_NIL"
