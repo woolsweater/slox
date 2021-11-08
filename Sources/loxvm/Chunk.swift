@@ -34,6 +34,23 @@ extension Chunk
     }
 
     /**
+     Replace the three bytes starting at `index` in `code` with the
+     bytes of `triple`, read little-endian-wise.
+     - precondition: `triple`'s value must fit into three bytes.
+     */
+    mutating func overwriteBytes(at index: Int, with triple: Int)
+    {
+        precondition(triple <= Int.threeByteMax, "Input too large: \(triple)")
+
+        var triple = triple.littleEndian
+        withUnsafeBytes(of: &triple, { (buf) in
+            self.code[index] = buf[0]
+            self.code[index+1] = buf[1]
+            self.code[index+2] = buf[2]
+        })
+    }
+
+    /**
      Add the given opcode, which represents an item at `line` in the
      original source, to the `Chunk`'s `code` list.
      */

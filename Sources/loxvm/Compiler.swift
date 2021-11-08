@@ -151,6 +151,9 @@ extension Compiler
         else if self.match(.leftBrace) {
             self.inScope(self.block)
         }
+        else if self.match(.if) {
+            self.ifStatement()
+        }
         else {
             self.expressionStatement()
         }
@@ -170,6 +173,81 @@ extension Compiler
         }
 
         self.mustConsume(.rightBrace, message: "Expected '}' to terminate block")
+    }
+
+    private func ifStatement()
+    {
+        //      ┌─────────────────────────┐
+        //      │ Expression (peek stack) │
+        //      └─┬───────────────────────┘
+        //      ┌─▼───┐
+        // False┤ JiF │
+        //    │ └─┬───┘
+        //    │   │ True
+        //    │  ┌▼────┐
+        //    │  │ POP │
+        //    │  └─┬───┘
+        //    │  ┌─▼───────────┐
+        //    │  │ "Then" body │
+        //    │  └┬────────────┘
+        //    │  ┌▼────┐
+        //    │  │ JMP ├─────────┐
+        //    │  └─────┘         │
+        //    │  ┌─────┐         │
+        //    └──▶ POP │         │
+        //       └─┬───┘         │
+        //       ┌─▼───────────┐ │
+        //       │ "Else" body │ │
+        //       └┬────────────┘ │
+        //       ┌▼───────────┐  │
+        //       │ (continue) ◀──┘
+        //       └────────────┘
+
+        self.mustConsume(.leftParen, message: "Expected '(' for 'if' condition")
+        self.expression()
+        self.mustConsume(.rightParen, message: "Expected ')' for 'if' condition")
+
+        let thenBranch = self.emitJump(.jumpIfFalse)
+        self.emitBytes(for: .pop)
+
+        self.statement()
+        let thenBodyEnd = self.emitJump(.jump)
+
+        self.emitBytes(for: .pop)
+        self.patchJump(at: thenBranch)
+
+        if self.match(.else) {
+            self.statement()
+        }
+
+        self.patchJump(at: thenBodyEnd)
+    }
+
+    /**
+     Write the given `OpCode` -- which must be an instruction for a jump -- to
+     the bytecode, followed by placeholder bytes for its operand.
+     - returns: The location of the operand in the chunk's bytecode.
+     */
+    private func emitJump(_ opCode: OpCode) -> Int
+    {
+        assert([.jumpIfFalse, .jump].contains(opCode))
+        self.emitBytes(for: opCode)
+        let location = self.chunk.code.count
+        for _ in 0..<OpCode.jumpOperandSize {
+            self.chunk.write(byte: 0xff, line: self.previousToken.lineNumber)
+        }
+        return location
+    }
+
+    /**
+     Overwrite the placeholder jump operand at `location` in the bytecode with
+     the distance from its own end to the current end of the bytecode, so that
+     the jump will land on the next instruction to be compiled.
+     */
+    private func patchJump(at location: Int)
+    {
+        let distance = self.chunk.code.count - location - OpCode.jumpOperandSize
+        self.chunk.overwriteBytes(at: location, with: distance)
     }
 
     private func expressionStatement()

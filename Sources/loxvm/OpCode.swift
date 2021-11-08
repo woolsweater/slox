@@ -53,6 +53,20 @@ enum OpCode : UInt8
      */
     case setLocal
 
+    /**
+     Read the top value of the stack and move the instruction pointer if it is
+     false. The operand, which is stored across the next three bytes, is the
+     count of bytes to jump by.
+     - remark: The stack value is left in place, not popped.
+     */
+    case jumpIfFalse
+
+    /**
+     Move the instruction pointer unconditionally. The operand, which is stored
+     across the next three bytes, is the count of bytes to jump by.
+     */
+    case jump
+
     /** Built-in literal values */
     case `nil`, `true`, `false`
 
@@ -69,4 +83,13 @@ enum OpCode : UInt8
      The operation for an expression statement; it is evaluated and discarded.
      */
     case pop
+}
+
+extension OpCode
+{
+    /** Byte size of a "long" instruction's operand */
+    static let longOperandSize = 3
+
+    /** Byte size of a jump instruction's operand. */
+    static let jumpOperandSize = 3
 }

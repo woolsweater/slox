@@ -1,0 +1,16 @@
+var a = false;
+var b = 10000;
+
+if (a) {
+    if (b) {
+       print("Both");
+    } else {
+       print("A");
+    }
+} else if (b) {
+    print("B");
+} else {
+    print("Neither");
+}
+
+print("Done!");
