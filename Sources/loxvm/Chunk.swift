@@ -97,6 +97,17 @@ extension Chunk
         }
     }
 
+    /**
+     Add an `operation` to the bytecode, along with the argument that it needs,
+     which is an instruction offset and needs to be augmented to account for the
+     operation's byte as well its own size.
+     */
+    mutating func write(operation: OpCode, offset: Int, line: Int)
+    {
+        let size = ((offset + 2) <= UInt8.max) ? 2 : 4
+        self.write(operation: operation, argument: offset + size, line: line)
+    }
+
     private mutating func write(triple: Int, line: Int)
     {
         precondition(triple <= Int.threeByteMax, "Input too large: \(triple)")
@@ -169,6 +180,7 @@ private extension OpCode
             case .defineGlobal: return .defineGlobalLong
             case .readGlobal: return .readGlobalLong
             case .setGlobal: return .setGlobalLong
+            case .loop: return .loopLong
             default:
                 fatalError("\(self) has no long variant")
         }

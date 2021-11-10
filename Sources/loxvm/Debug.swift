@@ -71,7 +71,12 @@ private func printArgumentInstruction(
             argumentValue = stack[localSlot: argument]
         case .setLocal:
             argumentValue = stack.peek()
-        default:
+        case .jumpIfTrue, .jumpIfFalse, .jump,
+             .loop, .loopLong:
+            argumentValue = .number(argument)
+        case .return, .print, .nil, .true, .false, .not, .negate, .equal,
+             .greater, .less, .add, .subtract, .multiply,
+             .divide, .pop:
             fatalError("Internal error: Not an argument instruction: \(opCode)")
     }
 
@@ -98,6 +103,11 @@ private func argument(for opCode: OpCode, at operandOffset: Int, in byteCode: [U
         case .jumpIfTrue, .jumpIfFalse, .jump:
             let argumentEnd = argumentOffset + OpCode.jumpOperandSize
             return byteCode[argumentOffset..<argumentEnd].loadInt()
+        case .loop:
+            return -Int(byteCode[argumentOffset])
+        case .loopLong:
+            let argumentEnd = argumentOffset + OpCode.jumpOperandSize
+            return -byteCode[argumentOffset..<argumentEnd].loadInt()
         case .return, .print, .nil, .true, .false, .not, .negate, .equal,
              .greater, .less, .add, .subtract, .multiply,
              .divide, .pop:
@@ -126,6 +136,8 @@ private extension OpCode
             case .jumpIfTrue: return "OP_JUMP_TRUE"
             case .jumpIfFalse: return "OP_JUMP_FALSE"
             case .jump: return "OP_JUMP"
+            case .loop: return "OP_LOOP"
+            case .loopLong: return "OP_LOOP_LONG"
             case .nil: return "OP_NIL"
             case .true: return "OP_TRUE"
             case .false: return "OP_FALSE"

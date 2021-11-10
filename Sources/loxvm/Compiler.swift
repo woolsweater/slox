@@ -154,6 +154,9 @@ extension Compiler
         else if self.match(.if) || self.match(.unless) {
             self.ifStatement(inverted: self.previousToken.kind == .unless)
         }
+        else if self.match(.while) {
+            self.whileStatement()
+        }
         else {
             self.expressionStatement()
         }
@@ -226,6 +229,23 @@ extension Compiler
         self.patchJump(at: thenBodyEnd)
     }
 
+    private func whileStatement()
+    {
+        let conditionLocation = self.chunk.code.count
+        self.mustConsume(.leftParen, message: "Expected '(' for 'while' condition")
+        let conditionLine = self.currentToken.lineNumber
+        self.expression()
+        self.mustConsume(.rightParen, message: "Expected ')' for 'while' condition")
+
+        let afterBody = self.emitJump(.jumpIfFalse)
+        self.emitBytes(for: .pop)
+        self.statement()
+
+        self.emitLoop(backTo: conditionLocation, on: conditionLine)
+        self.patchJump(at: afterBody)
+        self.emitBytes(for: .pop)
+    }
+
     /**
      Write the given `OpCode` -- which must be an instruction for a jump -- to
      the bytecode, followed by placeholder bytes for its operand.
@@ -251,6 +271,12 @@ extension Compiler
     {
         let distance = self.chunk.code.count - location - OpCode.jumpOperandSize
         self.chunk.overwriteBytes(at: location, with: distance)
+    }
+
+    private func emitLoop(backTo location: Int, on line: Int)
+    {
+        let distance = self.chunk.code.count - location
+        self.chunk.write(operation: .loop, offset: distance, line: line)
     }
 
     private func expressionStatement()

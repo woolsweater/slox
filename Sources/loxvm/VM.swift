@@ -144,6 +144,12 @@ extension VM
                     case .jump:
                         let offset = self.ip.advanceTakingThreeByteInt()
                         self.ip += offset
+                    case .loop:
+                        let offset = self.ip.advanceTakingInt()
+                        self.ip -= offset
+                    case .loopLong:
+                        let offset = self.ip.advanceTakingThreeByteInt()
+                        self.ip -= offset
                     case .nil:
                         self.stack.push(.nil)
                     case .true:
@@ -311,6 +317,11 @@ private extension InstructionPointer
     static func += (lhs: inout InstructionPointer, rhs: Code.Index)
     {
         lhs.address += rhs
+    }
+
+    static func -= (lhs: inout InstructionPointer, rhs: Code.Index)
+    {
+        lhs.address -= rhs
     }
 
     /**

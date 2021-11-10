@@ -67,6 +67,17 @@ enum OpCode : UInt8
      */
     case jump
 
+    /**
+     Move the instruction pointer unconditionally backwards. The operand is the
+     count of bytes to jump by.
+     - remark: This is basically the same as a `.jump` instruction, but the VM
+     negates the operand.
+
+     The "long" variant means that the index is stored across the next _three_
+     bytes, rather than one.
+     */
+    case loop, loopLong
+
     /** Built-in literal values */
     case `nil`, `true`, `false`
 
