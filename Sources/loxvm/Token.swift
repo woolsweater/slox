@@ -1,4 +1,3 @@
-
 /** An atomic Lox language entity, produced by scanning Lox source. */
 struct Token
 {

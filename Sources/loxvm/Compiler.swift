@@ -154,8 +154,8 @@ extension Compiler
         else if self.match(.if) || self.match(.unless) {
             self.ifStatement(inverted: self.previousToken.kind == .unless)
         }
-        else if self.match(.while) {
-            self.whileStatement()
+        else if self.match(.while) || self.match(.until) {
+            self.whileStatement(inverted: self.previousToken.kind == .until)
         }
         else {
             self.expressionStatement()
@@ -229,15 +229,15 @@ extension Compiler
         self.patchJump(at: thenBodyEnd)
     }
 
-    private func whileStatement()
+    private func whileStatement(inverted: Bool)
     {
         let conditionLocation = self.chunk.code.count
-        self.mustConsume(.leftParen, message: "Expected '(' for 'while' condition")
+        self.mustConsume(.leftParen, message: "Expected '(' for '\(inverted ? "until" : "while")' condition")
         let conditionLine = self.currentToken.lineNumber
         self.expression()
-        self.mustConsume(.rightParen, message: "Expected ')' for 'while' condition")
+        self.mustConsume(.rightParen, message: "Expected ')' for '\(inverted ? "until" : "while")' condition")
 
-        let afterBody = self.emitJump(.jumpIfFalse)
+        let afterBody = self.emitJump(inverted ? .jumpIfTrue : .jumpIfFalse)
         self.emitBytes(for: .pop)
         self.statement()
 

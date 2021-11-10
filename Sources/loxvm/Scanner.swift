@@ -303,7 +303,7 @@ extension Scanner
                 else { break }
                 switch self.source[self.source.index(self.lexemeStartIndex, offsetBy: 2)] {
                     case "l": return self.checkForKeyword(at: 3, rest: "ess", kind: .unless)
-                    case "t": return self.checkForKeyword(at: 3, rest: "til", kind: .until)
+                    case "t": return self.checkForKeyword(at: 3, rest: "il", kind: .until)
                     default: break
                 }
                 break
