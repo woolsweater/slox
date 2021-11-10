@@ -132,24 +132,21 @@ extension VM
                         let value = self.stack.peek()
                         self.stack[localSlot: index] = value
                     case .jumpIfTrue:
-                        let offset = self.ip.advanceTakingThreeByteInt()
+                        let address = self.ip.advanceTakingThreeByteInt()
                         if self.stack.peek().isTruthy {
-                            self.ip += offset
+                            self.ip.go(to: address)
                         }
                     case .jumpIfFalse:
-                        let offset = self.ip.advanceTakingThreeByteInt()
+                        let address = self.ip.advanceTakingThreeByteInt()
                         if self.stack.peek().isFalsey {
-                            self.ip += offset
+                            self.ip.go(to: address)
                         }
                     case .jump:
-                        let offset = self.ip.advanceTakingThreeByteInt()
-                        self.ip += offset
-                    case .loop:
-                        let offset = self.ip.advanceTakingInt()
-                        self.ip -= offset
-                    case .loopLong:
-                        let offset = self.ip.advanceTakingThreeByteInt()
-                        self.ip -= offset
+                        let address = self.ip.advanceTakingInt()
+                        self.ip.go(to: address)
+                    case .jumpLong:
+                        let address = self.ip.advanceTakingThreeByteInt()
+                        self.ip.go(to: address)
                     case .nil:
                         self.stack.push(.nil)
                     case .true:
@@ -319,9 +316,17 @@ private extension InstructionPointer
         lhs.address += rhs
     }
 
-    static func -= (lhs: inout InstructionPointer, rhs: Code.Index)
+    /**
+     Set the current address directly to the new `address` value.
+     - precondition: The address must be a valid index into the bytecode.
+     */
+    mutating func go(to address: Code.Index)
     {
-        lhs.address -= rhs
+        precondition(
+            0..<self.code.count ~= address,
+            "Invalid address for goto: \(address); code size \(self.code.count)"
+        )
+        self.address = address
     }
 
     /**

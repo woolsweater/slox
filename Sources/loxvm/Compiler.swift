@@ -253,10 +253,13 @@ extension Compiler
      */
     private func emitJump(_ opCode: OpCode) -> Int
     {
-        assert([.jumpIfTrue, .jumpIfFalse, .jump].contains(opCode), "Not a jump opcode: '\(opCode)'")
+        assert([.jumpIfTrue, .jumpIfFalse, .jump, .jumpLong].contains(opCode), "Not a jump opcode: '\(opCode)'")
+        // Since the destination address is not known at this point, the
+        // placeholder must always be long
+        let opCode: OpCode = (opCode == .jump) ? .jumpLong : opCode
         self.emitBytes(for: opCode)
         let location = self.chunk.code.count
-        for _ in 0..<OpCode.jumpOperandSize {
+        for _ in 0..<OpCode.longOperandSize {
             self.chunk.write(byte: 0xff, line: self.previousToken.lineNumber)
         }
         return location
@@ -269,14 +272,13 @@ extension Compiler
      */
     private func patchJump(at location: Int)
     {
-        let distance = self.chunk.code.count - location - OpCode.jumpOperandSize
-        self.chunk.overwriteBytes(at: location, with: distance)
+        let address = self.chunk.code.count
+        self.chunk.overwriteBytes(at: location, with: address)
     }
 
     private func emitLoop(backTo location: Int, on line: Int)
     {
-        let distance = self.chunk.code.count - location
-        self.chunk.write(operation: .loop, offset: distance, line: line)
+        self.chunk.write(operation: .jump, argument: location, line: line)
     }
 
     private func expressionStatement()

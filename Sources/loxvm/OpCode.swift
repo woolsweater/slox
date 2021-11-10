@@ -56,27 +56,18 @@ enum OpCode : UInt8
     /**
      Read the top value of the stack and move the instruction pointer if it is
      true or false respectively. The operand, which is stored across the next
-     three bytes, is the count of bytes to jump by.
+     three bytes, is the index to jump to in the bytecode.
      - remark: The stack value is left in place, not popped.
      */
     case jumpIfTrue, jumpIfFalse
 
     /**
      Move the instruction pointer unconditionally. The operand, which is stored
-     across the next three bytes, is the count of bytes to jump by.
+     across the next three bytes, is the index to jump to in the bytecode.
+     - remark: The "long" variant means that the index is stored across the next
+     _three_ bytes, rather than one.
      */
-    case jump
-
-    /**
-     Move the instruction pointer unconditionally backwards. The operand is the
-     count of bytes to jump by.
-     - remark: This is basically the same as a `.jump` instruction, but the VM
-     negates the operand.
-
-     The "long" variant means that the index is stored across the next _three_
-     bytes, rather than one.
-     */
-    case loop, loopLong
+    case jump, jumpLong
 
     /** Built-in literal values */
     case `nil`, `true`, `false`
@@ -100,7 +91,4 @@ extension OpCode
 {
     /** Byte size of a "long" instruction's operand */
     static let longOperandSize = 3
-
-    /** Byte size of a jump instruction's operand. */
-    static let jumpOperandSize = 3
 }

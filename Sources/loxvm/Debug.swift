@@ -71,8 +71,7 @@ private func printArgumentInstruction(
             argumentValue = stack[localSlot: argument]
         case .setLocal:
             argumentValue = stack.peek()
-        case .jumpIfTrue, .jumpIfFalse, .jump,
-             .loop, .loopLong:
+        case .jumpIfTrue, .jumpIfFalse, .jump, .jumpLong:
             argumentValue = .number(argument)
         case .return, .print, .nil, .true, .false, .not, .negate, .equal,
              .greater, .less, .add, .subtract, .multiply,
@@ -100,14 +99,11 @@ private func argument(for opCode: OpCode, at operandOffset: Int, in byteCode: [U
         case .constantLong, .defineGlobalLong, .readGlobalLong, .setGlobalLong:
             let argumentEnd = argumentOffset + OpCode.longOperandSize
             return byteCode[argumentOffset..<argumentEnd].loadInt()
-        case .jumpIfTrue, .jumpIfFalse, .jump:
-            let argumentEnd = argumentOffset + OpCode.jumpOperandSize
+        case .jumpIfTrue, .jumpIfFalse, .jumpLong:
+            let argumentEnd = argumentOffset + OpCode.longOperandSize
             return byteCode[argumentOffset..<argumentEnd].loadInt()
-        case .loop:
-            return -Int(byteCode[argumentOffset])
-        case .loopLong:
-            let argumentEnd = argumentOffset + OpCode.jumpOperandSize
-            return -byteCode[argumentOffset..<argumentEnd].loadInt()
+        case .jump:
+            return Int(byteCode[argumentOffset])
         case .return, .print, .nil, .true, .false, .not, .negate, .equal,
              .greater, .less, .add, .subtract, .multiply,
              .divide, .pop:
@@ -136,8 +132,7 @@ private extension OpCode
             case .jumpIfTrue: return "OP_JUMP_TRUE"
             case .jumpIfFalse: return "OP_JUMP_FALSE"
             case .jump: return "OP_JUMP"
-            case .loop: return "OP_LOOP"
-            case .loopLong: return "OP_LOOP_LONG"
+            case .jumpLong: return "OP_JUMP_LONG"
             case .nil: return "OP_NIL"
             case .true: return "OP_TRUE"
             case .false: return "OP_FALSE"
