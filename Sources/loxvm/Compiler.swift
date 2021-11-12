@@ -126,7 +126,7 @@ extension Compiler
 
     private func expression()
     {
-        self.parse(fromPrecedence: .assignment)
+        self.parse(fromPrecedence: .joined)
     }
 
     private func declaration()
@@ -772,7 +772,7 @@ private struct ParseRule
 {
     enum Precedence : CaseIterable, Comparable
     {
-        case none, assignment, or, and, equality, comparison, term, factor, unary, call, primary
+        case none, joined, assignment, or, and, equality, comparison, term, factor, unary, call, primary
 
         func incremented() -> Precedence
         {
@@ -821,7 +821,7 @@ private extension Compiler
             case .rightParen   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .leftBrace    : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .rightBrace   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .comma        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .comma        : return ParseRule(prefix: nil, infix: self.expression, precedence: .joined)
             case .dot          : return ParseRule(prefix: nil, infix: nil, precedence: .call)
             case .semicolon    : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .minus        : return ParseRule(nonassigningPrefix: self.unary, infix: self.binary, precedence: .term)

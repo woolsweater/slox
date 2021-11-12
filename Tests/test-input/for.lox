@@ -2,9 +2,8 @@ for (var a = 0; a <= 51; a = a + 3) {
     print a;
 }
 
-var a = 0;
+var a;
 var b;
-for (b = 2; a + b < 100; b = b + 2) {
+for (a = 0, b = 2; a + b < 100; a = b, b = b + 2) {
     print a + b;
-    a = b;
 }
