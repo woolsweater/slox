@@ -154,6 +154,9 @@ extension Compiler
         else if self.match(.if) || self.match(.unless) {
             self.ifStatement(inverted: self.previousToken.kind == .unless)
         }
+        else if self.match(.for) {
+            self.inScope(self.forStatement)
+        }
         else if self.match(.while) || self.match(.until) {
             self.whileStatement(inverted: self.previousToken.kind == .until)
         }
@@ -177,6 +180,8 @@ extension Compiler
 
         self.mustConsume(.rightBrace, message: "Expected '}' to terminate block")
     }
+
+    //MARK:- Control flow statements
 
     private func ifStatement(inverted: Bool)
     {
@@ -227,6 +232,112 @@ extension Compiler
         }
 
         self.patchJump(at: thenBodyEnd)
+    }
+
+    private func forStatement()
+    {
+        //         ┌─────────────┐
+        //         │ Initializer │
+        //         └─┬───────────┘
+        //         ┌─▼───────────┐
+        //         │  Condition  ◀───┐
+        //         └─┬───────────┘   │
+        //         ┌─▼───┐           │
+        // False ──┤ JiF │           │
+        //   │     └─┬───┘           │
+        //   │     ┌─▼──┐            │
+        //   │     │POP │            │
+        //   │     └┬───┘            │
+        //   │     ┌▼───┐            │
+        //   │     │JUMP├─────────┐  │
+        //   │     └────┘         │  │
+        //   │                    │  │
+        //   │     ┌───────────┐  │  │
+        //   │  ┌──▶ Increment │  │  │
+        //   │  │  └┬──────────┘  │  │
+        //   │  │  ┌▼───┐         │  │
+        //   │  │  │POP │         │  │
+        //   │  │  └┬───┘         │  │
+        //   │  │  ┌▼───┐        ┌┼┐ │
+        //   │  │  │JUMP├────────┘│└─┘
+        //   │  │  └────┘         │
+        //   │  │                 │
+        //   │  │  ┌───────────┐  │
+        //   │  │  │   Body    ◀──┘
+        //   │  │  └─┬─────────┘
+        //   │  │   ┌▼───┐
+        //   │  │   │JUMP│
+        //   │  │   └─┬──┘
+        //   │  └─────┘
+        //   │
+        //   │    ┌─────┐
+        //   └────▶ POP │
+        //        └─┬───┘
+        //        ┌─▼────────┐
+        //        │(continue)│
+        //        └──────────┘
+
+        self.mustConsume(.leftParen, message: "Expected '(' to begin 'for' statement clauses")
+        self.forStatementInitializer()
+        let conditionLoop: (location: Int, line: Int) = (self.chunk.code.count, self.currentToken.lineNumber)
+        let exitJump = self.forStatementCondition()
+        let incrementLoop = self.forStatementIncrement(with: conditionLoop)
+
+        self.statement()
+        let loopStart = incrementLoop ?? conditionLoop
+        self.emitLoop(backTo: loopStart.location, on: loopStart.line)
+
+        if let jump = exitJump {
+            self.patchJump(at: jump)
+            self.emitBytes(for: .pop)
+        }
+    }
+
+    private func forStatementInitializer()
+    {
+        if self.match(.semicolon) {
+            return
+        }
+        else if self.match(.var) {
+            self.variableDeclaration()
+        }
+        else {
+            self.expressionStatement()
+        }
+    }
+
+    private func forStatementCondition() -> Int?
+    {
+        if self.match(.semicolon) {
+            return nil
+        }
+
+        self.expression()
+        self.mustConsume(.semicolon, message: "Expected ';' to terminate 'for' condition")
+        let jump = self.emitJump(.jumpIfFalse)
+        self.emitBytes(for: .pop)
+        return jump
+    }
+
+    private func forStatementIncrement(with condition: (location: Int, line: Int))
+        -> (location: Int, line: Int)?
+    {
+        if self.match(.rightParen) {
+            return nil
+        }
+
+
+        let bodyJump = self.emitJump(.jump)
+
+        let incrementLoop = (self.chunk.code.count, self.currentToken.lineNumber)
+        self.expression()
+        self.emitBytes(for: .pop)
+        self.mustConsume(.rightParen, message: "Expected ')' to terminate 'for' clauses")
+
+        self.emitLoop(backTo: condition.location, on: condition.line)
+        self.patchJump(at: bodyJump)
+
+        return incrementLoop
     }
 
     private func whileStatement(inverted: Bool)
@@ -287,6 +398,8 @@ extension Compiler
         self.mustConsume(.semicolon, message: "Expected ';' to terminate expression")
         self.emitBytes(for: .pop)
     }
+
+    //MARK:- Variable statements
 
     private func variableDeclaration()
     {
