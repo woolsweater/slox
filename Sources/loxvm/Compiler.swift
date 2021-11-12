@@ -279,13 +279,13 @@ extension Compiler
 
         self.mustConsume(.leftParen, message: "Expected '(' to begin 'for' statement clauses")
         self.forStatementInitializer()
-        let conditionLoop: (location: Int, line: Int) = (self.chunk.code.count, self.currentToken.lineNumber)
+        let conditionLoop = self.currentLoopLocation()
         let exitJump = self.forStatementCondition()
         let incrementLoop = self.forStatementIncrement(with: conditionLoop)
 
         self.statement()
         let loopStart = incrementLoop ?? conditionLoop
-        self.emitLoop(backTo: loopStart.location, on: loopStart.line)
+        self.emitLoop(backTo: loopStart)
 
         if let jump = exitJump {
             self.patchJump(at: jump)
@@ -319,8 +319,7 @@ extension Compiler
         return jump
     }
 
-    private func forStatementIncrement(with condition: (location: Int, line: Int))
-        -> (location: Int, line: Int)?
+    private func forStatementIncrement(with condition: LoopLocation) -> LoopLocation?
     {
         if self.match(.rightParen) {
             return nil
@@ -329,12 +328,12 @@ extension Compiler
 
         let bodyJump = self.emitJump(.jump)
 
-        let incrementLoop = (self.chunk.code.count, self.currentToken.lineNumber)
+        let incrementLoop = self.currentLoopLocation()
         self.expression()
         self.emitBytes(for: .pop)
         self.mustConsume(.rightParen, message: "Expected ')' to terminate 'for' clauses")
 
-        self.emitLoop(backTo: condition.location, on: condition.line)
+        self.emitLoop(backTo: condition)
         self.patchJump(at: bodyJump)
 
         return incrementLoop
@@ -342,9 +341,8 @@ extension Compiler
 
     private func whileStatement(inverted: Bool)
     {
-        let conditionLocation = self.chunk.code.count
         self.mustConsume(.leftParen, message: "Expected '(' for '\(inverted ? "until" : "while")' condition")
-        let conditionLine = self.currentToken.lineNumber
+        let conditionLoop = self.currentLoopLocation()
         self.expression()
         self.mustConsume(.rightParen, message: "Expected ')' for '\(inverted ? "until" : "while")' condition")
 
@@ -352,7 +350,7 @@ extension Compiler
         self.emitBytes(for: .pop)
         self.statement()
 
-        self.emitLoop(backTo: conditionLocation, on: conditionLine)
+        self.emitLoop(backTo: conditionLoop)
         self.patchJump(at: afterBody)
         self.emitBytes(for: .pop)
     }
@@ -387,9 +385,17 @@ extension Compiler
         self.chunk.overwriteBytes(at: location, with: address)
     }
 
-    private func emitLoop(backTo location: Int, on line: Int)
+    private func emitLoop(backTo location: LoopLocation)
     {
-        self.chunk.write(operation: .jump, argument: location, line: line)
+        self.chunk.write(operation: .jump,
+                          argument: location.address,
+                              line: location.line)
+    }
+
+    private typealias LoopLocation = (address: Int, line: Int)
+    private func currentLoopLocation() -> LoopLocation
+    {
+        return (self.chunk.code.count, self.currentToken.lineNumber)
     }
 
     private func expressionStatement()
