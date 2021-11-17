@@ -1,0 +1,21 @@
+var target = 1;
+var value = 2;
+switch (value - 1) {
+  case 3: print "3";
+  case 2:
+    print "2";
+    print "Also";
+  case target: {
+    var x = "Got it";
+    print x;
+  }
+  case 10:
+    print "10";
+  case 1: print "Not this one";
+  case 12: {
+    var x = 12;
+    print x;
+  }
+  default:
+    print "Default";
+}

@@ -74,7 +74,7 @@ private func printArgumentInstruction(
         case .jumpIfTrue, .jumpIfFalse, .jump, .jumpLong:
             argumentValue = .number(argument)
         case .return, .print, .nil, .true, .false, .not, .negate, .equal,
-             .greater, .less, .add, .subtract, .multiply,
+             .greater, .less, .match, .add, .subtract, .multiply,
              .divide, .pop:
             fatalError("Internal error: Not an argument instruction: \(opCode)")
     }
@@ -105,7 +105,7 @@ private func argument(for opCode: OpCode, at operandOffset: Int, in byteCode: [U
         case .jump:
             return Int(byteCode[argumentOffset])
         case .return, .print, .nil, .true, .false, .not, .negate, .equal,
-             .greater, .less, .add, .subtract, .multiply,
+             .greater, .less, .match, .add, .subtract, .multiply,
              .divide, .pop:
             return nil
     }
@@ -141,6 +141,7 @@ private extension OpCode
             case .equal: return "OP_EQUAL"
             case .greater: return "OP_GREATER"
             case .less: return "OP_LESS"
+            case .match: return "OP_MATCH"
             case .add: return "OP_ADD"
             case .subtract: return "OP_SUBTRACT"
             case .multiply: return "OP_MULTIPLY"

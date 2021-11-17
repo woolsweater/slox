@@ -167,10 +167,18 @@ extension VM
                         let right = self.stack.pop()
                         let left = self.stack.pop()
                         self.stack.push(.bool(left == right))
-                    case .less:
-                        try self.performBinaryOp(<, wrapper: Value.bool)
                     case .greater:
                         try self.performBinaryOp(>, wrapper: Value.bool)
+                    case .less:
+                        try self.performBinaryOp(<, wrapper: Value.bool)
+                    case .match:
+                        let pattern = self.stack.pop()
+                        let value = self.stack.peek()
+                        let isMatch = (pattern == value)
+                        if isMatch {
+                            _ = self.stack.pop()
+                        }
+                        self.stack.push(.bool(isMatch))
                     case .add:
                         if case .object(_) = self.stack.peek(), case .object(_) = self.stack.peek(distance: 1) {
                             try self.concatenate()

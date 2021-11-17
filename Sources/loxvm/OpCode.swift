@@ -78,6 +78,13 @@ enum OpCode : UInt8
     /** Comparison operators, with operands on the VM's stack. */
     case equal, greater, less
 
+    /**
+     Like `equal`, but leaves the LHS on the stack when the comparison fails.
+     */
+    case match
+    //TODO: In the fullness of time also support customization of match
+    // behavior by classes.
+
     /** Arithmetic operators, with operands on the VM's stack. */
     case add, subtract, multiply, divide
 

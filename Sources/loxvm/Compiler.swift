@@ -122,6 +122,11 @@ extension Compiler
         self.currentToken.kind == kind
     }
 
+    private func endOfBlockOrFile() -> Bool
+    {
+        self.check(.rightBrace) || self.check(.EOF)
+    }
+
     //MARK:- Parsing
 
     private func expression()
@@ -157,6 +162,9 @@ extension Compiler
         else if self.match(.for) {
             self.inScope(self.forStatement)
         }
+        else if self.match(.switch) {
+            self.switchStatement()
+        }
         else if self.match(.while) || self.match(.until) {
             self.whileStatement(inverted: self.previousToken.kind == .until)
         }
@@ -174,7 +182,7 @@ extension Compiler
 
     private func block()
     {
-        while !self.check(.rightBrace) && !self.check(.EOF) {
+        while !self.endOfBlockOrFile() {
             self.declaration()
         }
 
@@ -325,7 +333,6 @@ extension Compiler
             return nil
         }
 
-
         let bodyJump = self.emitJump(.jump)
 
         let incrementLoop = self.currentLoopLocation()
@@ -339,12 +346,97 @@ extension Compiler
         return incrementLoop
     }
 
+    private func switchStatement()
+    {
+        self.mustConsume(.leftParen, message: "Expected '(' to begin 'switch' value")
+        self.expression()
+        self.mustConsume(.rightParen, message: "Expected ')' to terminate 'switch' value")
+        self.mustConsume(.leftBrace, message: "Expected '{' to begin 'switch' body")
+
+        // Although a switch is not actually a loop, as an implementation detail
+        // breaking from every individual case body will funnel back here, so
+        // there is a single jump point to the end.
+
+        //TODO: The jump to body should really be a short jump since we know it
+        // only has one other instruction to pass over.
+        let bodyJump = self.emitJump(.jump)
+        let sharedExit = self.currentLoopLocation()
+        let exitJump = self.emitJump(.jump)
+        self.patchJump(at: bodyJump)
+
+        var hasPattern = false
+        while !self.endOfBlockOrFile() {
+            if self.match(.case) {
+                hasPattern = true
+                let patternLine = self.currentToken.lineNumber
+                self.expression()
+                self.switchCase(line: patternLine, exit: sharedExit)
+            }
+            else if self.match(.default) {
+                hasPattern = true
+                guard self.switchDefault() else {
+                    return
+                }
+            }
+            else {
+                self.reportError(message: "Statements in a 'switch' must be within a 'case' or 'default' body")
+                return
+            }
+        }
+
+        self.mustConsume(.rightBrace, message: "Expected '}' to terminate 'switch' body")
+        guard hasPattern else {
+            self.reportError(message: "'switch' statement must have at least one pattern")
+            return
+        }
+
+        self.patchJump(at: exitJump)
+    }
+
+    private func switchCase(line: Int, exit: LoopLocation)
+    {
+        self.mustConsume(.colon, message: "Expected ':' after 'case' pattern")
+        self.emitBytes(for: .match, line: line)
+        let matchFailJump = self.emitJump(.jumpIfFalse)
+        self.emitBytes(for: .pop, line: line)
+        while !self.check(.case) && !self.check(.default) && !self.endOfBlockOrFile() {
+            self.statement()
+        }
+        self.emitLoop(backTo: exit)
+        self.patchJump(at: matchFailJump)
+        self.emitBytes(for: .pop, line: line)
+
+        // "Fall" into the next pattern clause (or just out of the switch)
+    }
+
+    private func switchDefault() -> Bool
+    {
+        self.emitBytes(for: .pop)
+        self.mustConsume(.colon, message: "Expected ':' after 'default' pattern")
+        while !self.endOfBlockOrFile() {
+            if self.match(.case) {
+                self.reportError(message: "'default' must be the last clause in a 'switch' statement")
+                return false
+            }
+            else if self.match(.default) {
+                //TODO: This should probably just be a warning.
+                self.reportError(message: "'switch' statement cannot have more than one 'default' clause")
+                return false
+            }
+            else {
+                self.statement()
+            }
+        }
+
+        return true
+    }
+
     private func whileStatement(inverted: Bool)
     {
-        self.mustConsume(.leftParen, message: "Expected '(' for '\(inverted ? "until" : "while")' condition")
         let conditionLoop = self.currentLoopLocation()
+        self.mustConsume(.leftParen, message: "Expected '(' to begin '\(inverted ? "until" : "while")' condition")
         self.expression()
-        self.mustConsume(.rightParen, message: "Expected ')' for '\(inverted ? "until" : "while")' condition")
+        self.mustConsume(.rightParen, message: "Expected ')' to terminate '\(inverted ? "until" : "while")' condition")
 
         let afterBody = self.emitJump(inverted ? .jumpIfTrue : .jumpIfFalse)
         self.emitBytes(for: .pop)
@@ -827,6 +919,7 @@ private extension Compiler
             case .rightParen   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .leftBrace    : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .rightBrace   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .colon        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .comma        : return ParseRule(prefix: nil, infix: self.expression, precedence: .joined)
             case .dot          : return ParseRule(prefix: nil, infix: nil, precedence: .call)
             case .semicolon    : return ParseRule(prefix: nil, infix: nil, precedence: .none)
@@ -847,7 +940,9 @@ private extension Compiler
             case .number       : return ParseRule(nonassigningPrefix: self.number, infix: nil, precedence: .none)
             case .and          : return ParseRule(prefix: nil, infix: self.logical, precedence: .and)
             case .break        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .case         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .class        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .default      : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .else         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .false        : return ParseRule(nonassigningPrefix: self.literal, infix: nil, precedence: .none)
             case .for          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
@@ -857,6 +952,7 @@ private extension Compiler
             case .or           : return ParseRule(prefix: nil, infix: self.logical, precedence: .or)
             case .print        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .return       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .switch       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .super        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .this         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .true         : return ParseRule(nonassigningPrefix: self.literal, infix: nil, precedence: .none)

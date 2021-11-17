@@ -19,7 +19,7 @@ extension Token
     {
         // Single-character punctuation
         case leftParen, rightParen, leftBrace, rightBrace
-        case comma, dot, semicolon
+        case colon, comma, dot, semicolon
         case minus, plus, slash, star
 
         // Single- and double-character punctuation
@@ -30,8 +30,9 @@ extension Token
         case identifier, string, number
 
         // Keywords
-        case and, `break`, `class`, `else`, `false`, `for`, fun, `if`, `nil`, or
-        case print, `return`, `super`, this, `true`, unless, until, `var`, `while`
+        case and, `break`, `case`, `class`, `default`, `else`, `false`, `for`
+        case fun, `if`, `nil`, or, print, `return`, `super`, `switch`, this
+        case `true`, unless, until, `var`, `while`
 
         case EOF
 
