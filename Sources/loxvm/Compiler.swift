@@ -162,8 +162,8 @@ extension Compiler
         else if self.match(.for) {
             self.inScope(self.forStatement)
         }
-        else if self.match(.switch) {
-            self.switchStatement()
+        else if self.match(.match) {
+            self.matchStatement()
         }
         else if self.match(.while) || self.match(.until) {
             self.whileStatement(inverted: self.previousToken.kind == .until)
@@ -346,15 +346,15 @@ extension Compiler
         return incrementLoop
     }
 
-    private func switchStatement()
+    private func matchStatement()
     {
-        self.mustConsume(.leftParen, message: "Expected '(' to begin 'switch' value")
+        self.mustConsume(.leftParen, message: "Expected '(' to begin 'match' value")
         self.expression()
-        self.mustConsume(.rightParen, message: "Expected ')' to terminate 'switch' value")
-        self.mustConsume(.leftBrace, message: "Expected '{' to begin 'switch' body")
+        self.mustConsume(.rightParen, message: "Expected ')' to terminate 'match' value")
+        self.mustConsume(.leftBrace, message: "Expected '{' to begin 'match' body")
 
-        // Although a switch is not actually a loop, as an implementation detail
-        // breaking from every individual case body will funnel back here, so
+        // Although this is not actually a loop, as an implementation detail
+        // breaking from every individual pattern arm will funnel back here, so
         // there is a single jump point to the end.
 
         //TODO: The jump to body should really be a short jump since we know it
@@ -366,69 +366,54 @@ extension Compiler
 
         var hasPattern = false
         while !self.endOfBlockOrFile() {
-            if self.match(.case) {
+            if self.currentToken.isWildcard {
+                hasPattern = true
+                self.advance()
+                self.matchWildcard()
+            }
+            else {
                 hasPattern = true
                 let patternLine = self.currentToken.lineNumber
                 self.expression()
-                self.switchCase(line: patternLine, exit: sharedExit)
-            }
-            else if self.match(.default) {
-                hasPattern = true
-                guard self.switchDefault() else {
-                    return
-                }
-            }
-            else {
-                self.reportError(message: "Statements in a 'switch' must be within a 'case' or 'default' body")
-                return
+                self.matchArm(line: patternLine, exit: sharedExit)
             }
         }
 
-        self.mustConsume(.rightBrace, message: "Expected '}' to terminate 'switch' body")
+        self.mustConsume(.rightBrace, message: "Expected '}' to terminate 'match' body")
         guard hasPattern else {
-            self.reportError(message: "'switch' statement must have at least one pattern")
+            self.reportError(message: "'match' statement must have at least one pattern")
             return
         }
 
         self.patchJump(at: exitJump)
     }
 
-    private func switchCase(line: Int, exit: LoopLocation)
+    private func matchArm(line: Int, exit: LoopLocation)
     {
-        self.mustConsume(.colon, message: "Expected ':' after 'case' pattern")
+        self.mustConsume(.arrow, message: "Expected '->' after pattern")
         self.emitBytes(for: .match, line: line)
         let matchFailJump = self.emitJump(.jumpIfFalse)
         self.emitBytes(for: .pop, line: line)
-        while !self.check(.case) && !self.check(.default) && !self.endOfBlockOrFile() {
-            self.statement()
-        }
+        self.statement()
         self.emitLoop(backTo: exit)
         self.patchJump(at: matchFailJump)
         self.emitBytes(for: .pop, line: line)
 
-        // "Fall" into the next pattern clause (or just out of the switch)
+        // "Fall" into the next pattern clause (or just out of the statement)
     }
 
-    private func switchDefault() -> Bool
+    private func matchWildcard()
     {
         self.emitBytes(for: .pop)
-        self.mustConsume(.colon, message: "Expected ':' after 'default' pattern")
-        while !self.endOfBlockOrFile() {
-            if self.match(.case) {
-                self.reportError(message: "'default' must be the last clause in a 'switch' statement")
-                return false
-            }
-            else if self.match(.default) {
-                //TODO: This should probably just be a warning.
-                self.reportError(message: "'switch' statement cannot have more than one 'default' clause")
-                return false
-            }
-            else {
-                self.statement()
-            }
+        self.mustConsume(.arrow, message: "Expected '->' after wildcard pattern")
+        self.statement()
+        if self.currentToken.isWildcard {
+            //TODO: This should probably just be a warning
+            self.reportError(message: "'match' statement cannot have more than one catch-all pattern")
         }
-
-        return true
+        else if !self.check(.rightBrace) {
+            self.reportError(message: "Catch-all pattern must be the last clause in a 'match' statement")
+        }
     }
 
     private func whileStatement(inverted: Bool)
@@ -927,6 +912,7 @@ private extension Compiler
             case .plus         : return ParseRule(prefix: nil, infix: self.binary, precedence: .term)
             case .slash        : return ParseRule(prefix: nil, infix: self.binary, precedence: .factor)
             case .star         : return ParseRule(prefix: nil, infix: self.binary, precedence: .factor)
+            case .arrow        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .bang         : return ParseRule(nonassigningPrefix: self.unary, infix: nil, precedence: .none)
             case .bangEqual    : return ParseRule(prefix: nil, infix: self.binary, precedence: .equality)
             case .equal        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
@@ -940,19 +926,17 @@ private extension Compiler
             case .number       : return ParseRule(nonassigningPrefix: self.number, infix: nil, precedence: .none)
             case .and          : return ParseRule(prefix: nil, infix: self.logical, precedence: .and)
             case .break        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .case         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .class        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .default      : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .else         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .false        : return ParseRule(nonassigningPrefix: self.literal, infix: nil, precedence: .none)
             case .for          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .fun          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .if           : return ParseRule(prefix: nil, infix: nil, precedence: .none)
+            case .match        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .nil          : return ParseRule(nonassigningPrefix: self.literal, infix: nil, precedence: .none)
             case .or           : return ParseRule(prefix: nil, infix: self.logical, precedence: .or)
             case .print        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .return       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
-            case .switch       : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .super        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .this         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .true         : return ParseRule(nonassigningPrefix: self.literal, infix: nil, precedence: .none)
@@ -1009,6 +993,14 @@ private extension Token
     static var dummy: Token
     {
         return Token(kind: .EOF, lexeme: "not a token", lineNumber: -1)
+    }
+
+    /**
+     Whether this is a `Token` for a '_' pattern, matching any value.
+     */
+    var isWildcard: Bool
+    {
+        self.kind == .identifier && self.lexeme == "_"
     }
 }
 

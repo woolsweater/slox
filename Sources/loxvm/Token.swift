@@ -23,15 +23,15 @@ extension Token
         case minus, plus, slash, star
 
         // Single- and double-character punctuation
-        case bang, bangEqual, equal, equalEqual
+        case arrow, bang, bangEqual, equal, equalEqual
         case greater, greaterEqual, less, lessEqual
 
         // Literals
         case identifier, string, number
 
         // Keywords
-        case and, `break`, `case`, `class`, `default`, `else`, `false`, `for`
-        case fun, `if`, `nil`, or, print, `return`, `super`, `switch`, this
+        case and, `break`, `class`, `else`, `false`, `for`
+        case fun, `if`, match, `nil`, or, print, `return`, `super`, this
         case `true`, unless, until, `var`, `while`
 
         case EOF

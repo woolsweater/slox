@@ -174,6 +174,8 @@ extension VM
                     case .match:
                         let pattern = self.stack.pop()
                         let value = self.stack.peek()
+                        //TODO: In the fullness of time also support customization of match
+                        // behavior by classes.
                         let isMatch = (pattern == value)
                         if isMatch {
                             _ = self.stack.pop()

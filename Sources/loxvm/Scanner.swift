@@ -71,7 +71,7 @@ extension Scanner
             case ",": nextKind = .comma
             case ".": nextKind = .dot
             case ";": nextKind = .semicolon
-            case "-": nextKind = .minus
+            case "-": nextKind = (self.readMatch(">") ? .arrow : .minus)
             case "+": nextKind = .plus
             case "/": nextKind = .slash
             case "*": nextKind = .star
@@ -273,13 +273,7 @@ extension Scanner
         switch self.currentLexeme.first! {
             case "a": return self.checkForKeyword(at: 1, rest: "nd", kind: .and)
             case "c":
-                guard self.currentLexeme.count > 3 else { break }
-                switch self.source[self.source.index(after: self.lexemeStartIndex)] {
-                    case "a": return self.checkForKeyword(at: 2, rest: "se", kind: .case)
-                    case "l": return self.checkForKeyword(at: 2, rest: "ass", kind: .class)
-                    default: break
-                }
-            case "d": return self.checkForKeyword(at: 1, rest: "efault", kind: .default)
+                return self.checkForKeyword(at: 1, rest: "lass", kind: .class)
             case "e": return self.checkForKeyword(at: 1, rest: "lse", kind: .else)
             case "f":
                 guard self.currentLexeme.count > 2 else { break }
@@ -291,17 +285,13 @@ extension Scanner
                 }
                 break
             case "i": return self.checkForKeyword(at: 1, rest: "f", kind: .if)
+            case "m": return self.checkForKeyword(at: 1, rest: "atch", kind: .match)
             case "n": return self.checkForKeyword(at: 1, rest: "il", kind: .nil)
             case "o": return self.checkForKeyword(at: 1, rest: "r", kind: .or)
             case "p": return self.checkForKeyword(at: 1, rest: "rint", kind: .print)
             case "r": return self.checkForKeyword(at: 1, rest: "eturn", kind: .return)
             case "s":
-                guard self.currentLexeme.count > 4 else { break }
-                switch self.source[self.source.index(after: self.lexemeStartIndex)] {
-                    case "u": return self.checkForKeyword(at: 2, rest: "per", kind: .super)
-                    case "w": return self.checkForKeyword(at: 2, rest: "itch", kind: .switch)
-                    default: break
-                }
+                return self.checkForKeyword(at: 1, rest: "uper", kind: .super)
             case "t":
                 guard self.currentLexeme.count > 3 else { break }
                 switch self.source[self.source.index(after: self.lexemeStartIndex)] {
