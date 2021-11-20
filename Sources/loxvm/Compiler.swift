@@ -32,6 +32,7 @@ class Compiler
     private let globals: GlobalVariables
     private var locals: LocalVariables
     private var currentScope: Scope = .global
+    private var loops: [LoopLocation] = []
     private let allocator: MemoryManager
     private lazy var stringCompiler = StringCompiler(allocate: { [allocator] in allocator.allocateBuffer(of: UInt8.self, count: $0) },
                                                       destroy: { [allocator] in allocator.destroyBuffer($0) })
@@ -150,11 +151,15 @@ extension Compiler
 
     private func statement()
     {
-        if self.match(.print) {
-            self.printStatement()
-        }
-        else if self.match(.leftBrace) {
+        if self.match(.leftBrace) {
             self.inScope(self.block)
+        }
+        else if self.match(.continue) {
+            guard let currentLoop = self.loops.last else {
+                self.reportError(message: "Cannot 'continue' outside a loop")
+                return
+            }
+            self.continueStatement(in: currentLoop)
         }
         else if self.match(.if) || self.match(.unless) {
             self.ifStatement(inverted: self.previousToken.kind == .unless)
@@ -164,6 +169,9 @@ extension Compiler
         }
         else if self.match(.match) {
             self.matchStatement()
+        }
+        else if self.match(.print) {
+            self.printStatement()
         }
         else if self.match(.while) || self.match(.until) {
             self.whileStatement(inverted: self.previousToken.kind == .until)
@@ -291,9 +299,11 @@ extension Compiler
         let conditionLoop = self.currentLoopLocation()
         let exitJump = self.forStatementCondition()
         let incrementLoop = self.forStatementIncrement(with: conditionLoop)
+        let loopStart = incrementLoop ?? conditionLoop
+        self.loops.append(loopStart)
+        defer { _ = self.loops.popLast() }
 
         self.statement()
-        let loopStart = incrementLoop ?? conditionLoop
         self.emitLoop(backTo: loopStart)
 
         if let jump = exitJump {
@@ -345,6 +355,12 @@ extension Compiler
         self.patchJump(at: bodyJump)
 
         return incrementLoop
+    }
+
+    private func continueStatement(in loopStart: LoopLocation)
+    {
+        self.mustConsume(.semicolon, message: "Expected ';' after 'continue'")
+        self.emitLoop(backTo: loopStart)
     }
 
     private func matchStatement()
@@ -420,6 +436,8 @@ extension Compiler
     private func whileStatement(inverted: Bool)
     {
         let conditionLoop = self.currentLoopLocation()
+        self.loops.append(conditionLoop)
+        defer { _ = self.loops.popLast() }
         self.mustConsume(.leftParen, message: "Expected '(' to begin '\(inverted ? "until" : "while")' condition")
         self.expression()
         self.mustConsume(.rightParen, message: "Expected ')' to terminate '\(inverted ? "until" : "while")' condition")
@@ -907,6 +925,7 @@ private extension Compiler
             case .rightBrace   : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .colon        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .comma        : return ParseRule(prefix: nil, infix: self.expression, precedence: .joined)
+            case .continue     : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .dot          : return ParseRule(prefix: nil, infix: nil, precedence: .call)
             case .semicolon    : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .minus        : return ParseRule(nonassigningPrefix: self.unary, infix: self.binary, precedence: .term)

@@ -273,7 +273,12 @@ extension Scanner
         switch self.currentLexeme.first! {
             case "a": return self.checkForKeyword(at: 1, rest: "nd", kind: .and)
             case "c":
-                return self.checkForKeyword(at: 1, rest: "lass", kind: .class)
+                guard self.currentLexeme.count > 4 else { break }
+                switch self.source[self.source.index(after: self.lexemeStartIndex)] {
+                    case "l": return self.checkForKeyword(at: 2, rest: "ass", kind: .class)
+                    case "o": return self.checkForKeyword(at: 2, rest: "ntinue", kind: .continue)
+                    default: break
+                }
             case "e": return self.checkForKeyword(at: 1, rest: "lse", kind: .else)
             case "f":
                 guard self.currentLexeme.count > 2 else { break }
