@@ -240,6 +240,7 @@ extension Compiler
         }
 
         self.patchJump(at: thenBodyEnd)
+        self.emitBytes(for: .pop)
     }
 
     private func forStatement()
