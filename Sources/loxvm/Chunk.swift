@@ -140,20 +140,6 @@ extension Chunk
     }
 }
 
-private extension Array
-{
-    /**
-     Directly change the value of the last element using the given function.
-     - warning: Traps if the array is empty.
-     */
-    mutating func mutateLast(_ mutate: (inout Element) -> Void)
-    {
-        precondition(!(self.isEmpty))
-        let lastIndex = self.indices.last!
-        mutate(&self[lastIndex])
-    }
-}
-
 private extension Int
 {
     /** The highest value that can be stored in three bytes unsigned. */

@@ -31,8 +31,24 @@ class Compiler
     private let strings: HashTable
     private let globals: GlobalVariables
     private var locals: LocalVariables
+
+    /** The level of nesting at the current point of compilation. */
     private var currentScope: Scope = .global
+
+    /**
+     Start points for any loops surrounding the current point of compilation.
+     Empty if no loop is currently being compiled.
+     - remark: This is read when compiling a `continue` statement, to jump back
+     to the appropriate place.
+     */
     private var loops: [LoopLocation] = []
+
+    /**
+     The bytecode locations of any `break` statements compiled during the
+     current loop. These need to be jump patched at the end of loop compilation.
+     */
+    private var loopBreaks: [Int] = []
+
     private let allocator: MemoryManager
     private lazy var stringCompiler = StringCompiler(allocate: { [allocator] in allocator.allocateBuffer(of: UInt8.self, count: $0) },
                                                       destroy: { [allocator] in allocator.destroyBuffer($0) })
@@ -154,12 +170,11 @@ extension Compiler
         if self.match(.leftBrace) {
             self.inScope(self.block)
         }
+        else if self.match(.break) {
+            self.breakStatement()
+        }
         else if self.match(.continue) {
-            guard let currentLoop = self.loops.last else {
-                self.reportError(message: "Cannot 'continue' outside a loop")
-                return
-            }
-            self.continueStatement(in: currentLoop)
+            self.continueStatement()
         }
         else if self.match(.if) || self.match(.unless) {
             self.ifStatement(inverted: self.previousToken.kind == .unless)
@@ -237,8 +252,8 @@ extension Compiler
         self.statement()
         let thenBodyEnd = self.emitJump(.jump)
 
-        self.emitBytes(for: .pop)
         self.patchJump(at: thenBranch)
+        self.emitBytes(for: .pop)
 
         if self.match(.else) {
             guard !(inverted) else {
@@ -248,7 +263,6 @@ extension Compiler
         }
 
         self.patchJump(at: thenBodyEnd)
-        self.emitBytes(for: .pop)
     }
 
     private func forStatement()
@@ -300,8 +314,12 @@ extension Compiler
         let exitJump = self.forStatementCondition()
         let incrementLoop = self.forStatementIncrement(with: conditionLoop)
         let loopStart = incrementLoop ?? conditionLoop
+
         self.loops.append(loopStart)
         defer { _ = self.loops.popLast() }
+
+        let outerLoopBreaks = self.loopBreaks.moveAll()
+        defer { self.loopBreaks = outerLoopBreaks }
 
         self.statement()
         self.emitLoop(backTo: loopStart)
@@ -310,6 +328,9 @@ extension Compiler
             self.patchJump(at: jump)
             self.emitBytes(for: .pop)
         }
+        // Jumping unconditionally from inside the body; the condition is not on
+        // the stack, so nothing needs to be popped.
+        self.patchBreakJumps()
     }
 
     private func forStatementInitializer()
@@ -357,10 +378,34 @@ extension Compiler
         return incrementLoop
     }
 
-    private func continueStatement(in loopStart: LoopLocation)
+    private func breakStatement()
     {
+        guard !(self.loops.isEmpty) else {
+            self.reportError(message: "Cannot 'break' outside a loop")
+            return
+        }
+
+        self.mustConsume(.semicolon, message: "Expected ';' after 'break'")
+        let jump = self.emitJump(.jump)
+        self.loopBreaks.append(jump)
+    }
+
+    private func patchBreakJumps()
+    {
+        while let breakLocation = self.loopBreaks.popLast() {
+            self.patchJump(at: breakLocation)
+        }
+    }
+
+    private func continueStatement()
+    {
+        guard let currentLoop = self.loops.last else {
+            self.reportError(message: "Cannot 'continue' outside a loop")
+            return
+        }
+
         self.mustConsume(.semicolon, message: "Expected ';' after 'continue'")
-        self.emitLoop(backTo: loopStart)
+        self.emitLoop(backTo: currentLoop)
     }
 
     private func matchStatement()
@@ -438,6 +483,9 @@ extension Compiler
         let conditionLoop = self.currentLoopLocation()
         self.loops.append(conditionLoop)
         defer { _ = self.loops.popLast() }
+        let outerLoopBreaks = self.loopBreaks.moveAll()
+        defer { self.loopBreaks = outerLoopBreaks }
+
         self.mustConsume(.leftParen, message: "Expected '(' to begin '\(inverted ? "until" : "while")' condition")
         self.expression()
         self.mustConsume(.rightParen, message: "Expected ')' to terminate '\(inverted ? "until" : "while")' condition")
@@ -449,6 +497,9 @@ extension Compiler
         self.emitLoop(backTo: conditionLoop)
         self.patchJump(at: afterBody)
         self.emitBytes(for: .pop)
+        // Jumping unconditionally from inside the body; the condition is not on
+        // the stack, so nothing needs to be popped.
+        self.patchBreakJumps()
     }
 
     /**
@@ -733,7 +784,7 @@ extension Compiler
         switch self.locals.resolve(name) {
             case .failure(_):
                 self.reportError(message: "Cannot access variable '\(name)' in its own initializer.")
-                return (true, 0)  // Will never be executed
+                return (true, -1)  // Will never be executed by the VM
             case let .success(.some(localIndex)):
                 return (true, localIndex)
             case .success(nil):

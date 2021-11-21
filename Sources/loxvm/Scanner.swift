@@ -272,6 +272,7 @@ extension Scanner
     {
         switch self.currentLexeme.first! {
             case "a": return self.checkForKeyword(at: 1, rest: "nd", kind: .and)
+            case "b": return self.checkForKeyword(at: 1, rest: "reak", kind: .break)
             case "c":
                 guard self.currentLexeme.count > 4 else { break }
                 switch self.source[self.source.index(after: self.lexemeStartIndex)] {
