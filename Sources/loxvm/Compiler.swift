@@ -883,7 +883,8 @@ extension Compiler
 
             switch self.currentToken.kind {
                 // or _on_ an appropriate keyword.
-                case .class, .fun, .var, .for, .if, .while, .print, .return:
+                case .break, .class, .continue, .fun, .for, .if, .match, .print,
+                     .return, .unless, .until, .var, .while:
                     return
                 default:
                     break
