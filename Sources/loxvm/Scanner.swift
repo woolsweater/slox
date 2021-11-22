@@ -285,6 +285,7 @@ extension Scanner
                 guard self.currentLexeme.count > 2 else { break }
                 switch self.source[self.source.index(after: self.lexemeStartIndex)] {
                     case "a": return self.checkForKeyword(at: 2, rest: "lse", kind: .false)
+                    case "i": return self.checkForKeyword(at: 2, rest: "nally", kind: .finally)
                     case "o": return self.checkForKeyword(at: 2, rest: "r", kind: .for)
                     case "u": return self.checkForKeyword(at: 2, rest: "n", kind: .fun)
                     default: break

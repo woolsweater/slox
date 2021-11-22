@@ -47,7 +47,13 @@ class Compiler
      The bytecode locations of any `break` statements compiled during the
      current loop. These need to be jump patched at the end of loop compilation.
      */
-    private var loopBreaks: [Int] = []
+    private var breakLocations: [Int] = []
+
+    /**
+     Loop/jump locations for any `finally` statements compiled during the
+     current block. These will be fixed up at the end of the block compilation.
+     */
+    private var finallyLocations: [(LoopLocation, Int)] = []
 
     private let allocator: MemoryManager
     private lazy var stringCompiler = StringCompiler(allocate: { [allocator] in allocator.allocateBuffer(of: UInt8.self, count: $0) },
@@ -179,6 +185,9 @@ extension Compiler
         else if self.match(.if) || self.match(.unless) {
             self.ifStatement(inverted: self.previousToken.kind == .unless)
         }
+        else if self.match(.finally) {
+            self.finallyStatement()
+        }
         else if self.match(.for) {
             self.inScope(self.forStatement)
         }
@@ -205,11 +214,23 @@ extension Compiler
 
     private func block()
     {
+        let outerLocations = self.finallyLocations.moveAll()
+        defer { self.finallyLocations = outerLocations }
+
         while !self.endOfBlockOrFile() {
             self.declaration()
         }
 
         self.mustConsume(.rightBrace, message: "Expected '}' to terminate block")
+
+        // `finally` statements execute as a stack -- reverse declaration order
+        while let (body, exitReturn) = self.finallyLocations.popLast() {
+            //TODO: These could be chained instead -- each exit jump goes to the
+            // next loop location. That would save an instruction for every
+            // `finally` after the first.
+            self.emitLoop(backTo: body)
+            self.patchJump(at: exitReturn)
+        }
     }
 
     //MARK:- Control flow statements
@@ -265,6 +286,26 @@ extension Compiler
         self.patchJump(at: thenBodyEnd)
     }
 
+    private func finallyStatement()
+    {
+        if case .global = self.currentScope {
+            self.reportError(message: "'finally' statement cannot occur at top level")
+        }
+
+        let overBodyJump = self.emitJump(.jump)
+
+        // From scope exit back to `finally` body
+        let bodyLocation = self.currentLoopLocation()
+
+        self.statement()
+
+        // Then back to the scope exit
+        let returnJump = self.emitJump(.jump)
+        self.finallyLocations.append((bodyLocation, returnJump))
+
+        self.patchJump(at: overBodyJump)
+    }
+
     private func forStatement()
     {
         //         ┌─────────────┐
@@ -318,8 +359,8 @@ extension Compiler
         self.loops.append(loopStart)
         defer { _ = self.loops.popLast() }
 
-        let outerLoopBreaks = self.loopBreaks.moveAll()
-        defer { self.loopBreaks = outerLoopBreaks }
+        let outerBreakLocations = self.breakLocations.moveAll()
+        defer { self.breakLocations = outerBreakLocations }
 
         self.statement()
         self.emitLoop(backTo: loopStart)
@@ -387,12 +428,12 @@ extension Compiler
         }
 
         let jump = self.emitJump(.jump)
-        self.loopBreaks.append(jump)
+        self.breakLocations.append(jump)
     }
 
     private func patchBreakJumps()
     {
-        while let breakLocation = self.loopBreaks.popLast() {
+        while let breakLocation = self.breakLocations.popLast() {
             self.patchJump(at: breakLocation)
         }
     }
@@ -482,8 +523,8 @@ extension Compiler
         let conditionLoop = self.currentLoopLocation()
         self.loops.append(conditionLoop)
         defer { _ = self.loops.popLast() }
-        let outerLoopBreaks = self.loopBreaks.moveAll()
-        defer { self.loopBreaks = outerLoopBreaks }
+        let outerBreakLocations = self.breakLocations.moveAll()
+        defer { self.breakLocations = outerBreakLocations }
 
         self.mustConsume(.leftParen, message: "Expected '(' to begin '\(inverted ? "until" : "while")' condition")
         self.expression()
@@ -882,8 +923,8 @@ extension Compiler
 
             switch self.currentToken.kind {
                 // or _on_ an appropriate keyword.
-                case .break, .class, .continue, .fun, .for, .if, .match, .print,
-                     .return, .unless, .until, .var, .while:
+                case .break, .class, .continue, .finally, .fun, .for, .if,
+                     .match, .print, .return, .unless, .until, .var, .while:
                     return
                 default:
                     break
@@ -1000,6 +1041,7 @@ private extension Compiler
             case .class        : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .else         : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .false        : return ParseRule(nonassigningPrefix: self.literal, infix: nil, precedence: .none)
+            case .finally      : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .for          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .fun          : return ParseRule(prefix: nil, infix: nil, precedence: .none)
             case .if           : return ParseRule(prefix: nil, infix: nil, precedence: .none)

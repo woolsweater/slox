@@ -1,0 +1,13 @@
+{
+  print "scope begin";                 // 1
+  finally {
+    var i = "inner";
+    print "outer begin";               // 4
+    finally print i;                   // 6
+    print "outer end";                 // 5
+  }
+  finally {
+    print "🥞 – this before 'outer'";  // 3
+  }
+  print "scope end";                   // 2
+}
