@@ -256,8 +256,8 @@ extension Compiler
         self.emitBytes(for: .pop)
 
         if self.match(.else) {
-            guard !(inverted) else {
-                return self.reportError(message: "'unless' statement cannot have an 'else' clause.")
+            if inverted {
+                self.reportError(message: "'unless' statement cannot have an 'else' clause.")
             }
             self.statement()
         }
@@ -380,12 +380,12 @@ extension Compiler
 
     private func breakStatement()
     {
+        self.mustConsume(.semicolon, message: "Expected ';' after 'break'")
+
         guard !(self.loops.isEmpty) else {
-            self.reportError(message: "Cannot 'break' outside a loop")
-            return
+            return self.reportError(message: "Cannot 'break' outside a loop")
         }
 
-        self.mustConsume(.semicolon, message: "Expected ';' after 'break'")
         let jump = self.emitJump(.jump)
         self.loopBreaks.append(jump)
     }
@@ -399,12 +399,12 @@ extension Compiler
 
     private func continueStatement()
     {
+        self.mustConsume(.semicolon, message: "Expected ';' after 'continue'")
+
         guard let currentLoop = self.loops.last else {
-            self.reportError(message: "Cannot 'continue' outside a loop")
-            return
+            return self.reportError(message: "Cannot 'continue' outside a loop")
         }
 
-        self.mustConsume(.semicolon, message: "Expected ';' after 'continue'")
         self.emitLoop(backTo: currentLoop)
     }
 
@@ -443,8 +443,7 @@ extension Compiler
 
         self.mustConsume(.rightBrace, message: "Expected '}' to terminate 'match' body")
         guard hasPattern else {
-            self.reportError(message: "'match' statement must have at least one pattern")
-            return
+            return self.reportError(message: "'match' statement must have at least one pattern")
         }
 
         self.patchJump(at: exitJump)
